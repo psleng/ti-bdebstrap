@@ -75,10 +75,10 @@ bsp_version=$3
             --single-branch \
             --depth=1 &>>"${LOG_FILE}"
         log ">> ti-u-boot: cloned"
-        if [ -d ${topdir}/ti-bdebstrap/patches/ti-u-boot ]; then
+        if [ -d ${topdir}/ti-bdebstrap/patches/$BUILDTYPE/ti-u-boot ]; then
             log ">> ti-u-boot: patching .."
             cd ti-u-boot
-            git apply ${topdir}/ti-bdebstrap/patches/ti-u-boot/* &>>"${LOG_FILE}"
+            git apply ${topdir}/ti-bdebstrap/patches/$BUILDTYPE/ti-u-boot/* &>>"${LOG_FILE}"
             cd ..
         fi
     else

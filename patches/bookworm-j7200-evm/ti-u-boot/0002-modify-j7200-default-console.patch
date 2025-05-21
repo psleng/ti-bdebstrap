@@ -1,0 +1,13 @@
+diff --git a/board/ti/j721e/j721e.env b/board/ti/j721e/j721e.env
+index e7bc76431e6..7c78b3f6653 100644
+--- a/board/ti/j721e/j721e.env
++++ b/board/ti/j721e/j721e.env
+@@ -13,7 +13,7 @@ defined(CONFIG_TARGET_J721E_R5_EVM)
+ #endif
+ 
+ name_kern=Image
+-console=ttyS2,115200n8
++console=ttyS0,115200n8
+ args_all=setenv optargs earlycon=ns16550a,mmio32,0x02800000
+ 	${mtdparts}
+ run_kern=booti ${loadaddr} ${rd_spec} ${fdtaddr}

@@ -46,10 +46,10 @@ function mkdeb() {
     CHANGELOG=$PKG/usr/share/doc/$PKGNAME/changelog.gz
     mkdir -p $(dirname $CHANGELOG)
     (
-     cd build/*/bsp_sources/ti-u-boot
      echo "$PKGNAME ($VERS) unstable; urgency=medium"
      echo "  [ psleng ]"
      echo "  * $PKGNAME binaries"
+     # cd build/*/bsp_sources/ti-u-boot
      # git log | sed 's/^./* &/'
      echo
      echo " -- TI (nobody@example.com) $(date -R)"
@@ -67,7 +67,7 @@ function mkdeb() {
     fakeroot dpkg-deb --build $PKG
 
     DEBPKG=${PKGNAME}_${VERS}_${ARCH}.deb
-    DST=vyos-build/packages/$DEBPKG
+    DST=${topdir}/ti-bdebstrap/$DEBPKG
     mv -f $PKG.deb $DST
     echo "I: $0: Made $(realpath $DST) from $dir"
     # lintian $DEBPKG

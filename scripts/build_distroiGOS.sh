@@ -30,8 +30,8 @@ bsp_version=$2
 
     mkdir -p ${topdir}/images/${build}
     cd ${topdir}/build/${build}
-    rm -rf tisdk-debian-${distro}-${bsp_version}-rootfs
-    cp -ra ../fs/ tisdk-debian-${distro}-${bsp_version}-rootfs
+# PERLE   rm -rf tisdk-debian-${distro}-${bsp_version}-rootfs
+    cp -ra ../fs/* tisdk-debian-${distro}-${bsp_version}-rootfs/
 
     log "> Cleaning up ${build}"
 #    If we tar file system, it cause to be missing special file capabilities. (by Dennis Kong).
@@ -50,7 +50,7 @@ bsp_version=$2
     mksquashfs tisdk-debian-${distro}-${bsp_version}-boot tisdk-debian-${distro}-${bsp_version}-boot.squashfs -comp xz -noappend &>>"${LOG_FILE}"
     mv tisdk-debian-${distro}-${bsp_version}-boot.squashfs ${topdir}/images/${build}
 
-    rm -rf bsp_sources
+#    rm -rf bsp_sources
 
     cd ${topdir}/build/
 

@@ -11,6 +11,8 @@ function setup_log_file() {
 
     LOG_FILE="$LOG_DIR/${filename}.log"
 
+    log "Image output LOG_FILE: ${LOG_FILE}"
+
     # if log file already exists, replace it with a new one for this build
     if [ -f "$LOG_FILE" ]; then
         rm -f "$LOG_FILE"

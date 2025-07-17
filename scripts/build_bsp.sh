@@ -53,17 +53,77 @@ bsp_version=$3
         cd ${topdir}/build/${build}/bsp_sources
         log ">> optee_os: not found. cloning .."
         optee_srcrev=($(read_bsp_config ${bsp_version} optee_srcrev))
+        # optee_srcrev=4.5.0
 
-        git clone https://github.com/OP-TEE/optee_os.git &>>"${LOG_FILE}"
+        git clone https://github.com/psleng/optee_os.git &>>"${LOG_FILE}"
 
         cd optee_os
         git checkout ${optee_srcrev} &>>"${LOG_FILE}"
         cd ..
         log ">> optee_os: cloned"
     else
-        log ">> optee_os: available"
+        log ">> optee_os: already available"
     fi
     OPTEE_DIR=${topdir}/build/${build}/bsp_sources/optee_os
+
+    cd ${OPTEE_DIR}
+    if [ ! -d optee_client ]; then
+        log ">> optee_client: not found. cloning .."
+        client_srcrev=($(read_bsp_config ${bsp_version} client_srcrev))
+        # client_srcrev=4.5.0
+
+        git clone https://github.com/psleng/optee_client.git &>>"${LOG_FILE}"
+
+        cd optee_client
+        git checkout ${client_srcrev} &>>"${LOG_FILE}"
+        log ">> optee_client: cloned"
+    else
+        log ">> optee_client: already available"
+    fi
+    # PERLE copy updates for our build
+    # cp ${topdir}/updates/optee-os/optee_client/* ${OPTEE_DIR}/optee_client
+    # cp ${topdir}/updates/optee-os/optee_client/tee-supplicant/* ${OPTEE_DIR}/optee_client/tee-supplicant
+    OPTEE_CLIENT_DIR=${OPTEE_DIR}/optee_client
+
+    cd ${OPTEE_DIR}/ta
+    if [ ! -d optee_ftpm ]; then
+        # cd ${topdir}/build/${build}/bsp_sources
+        log ">> optee_ftpm: not found. cloning .."
+        # ftpm_srcrev=6f99e783eb9bb57c314a881433d4ec970de87959
+        ftpm_srcrev=($(read_bsp_config ${bsp_version} ftpm_srcrev))
+
+        git clone https://github.com/psleng/optee_ftpm.git &>>"${LOG_FILE}"
+
+        cd optee_ftpm
+        git checkout ${ftpm_srcrev} &>>"${LOG_FILE}"
+        log ">> optee_ftpm: cloned"
+    else
+        log ">> optee_ftpm: already available"
+    fi
+    # PERLE copy updates for our build
+    # cp ${topdir}/updates/optee-os/ta/optee_ftpm/* ${OPTEE_DIR}/ta/optee_ftpm
+    # cp ${topdir}/updates/optee-os/ta/optee_ftpm/platform/include/* ${OPTEE_DIR}/ta/optee_ftpm/platform/include
+    # OPTEE_FTPM_DIR=${OPTEE_DIR}/ta/optee_ftpm
+
+    cd ${OPTEE_DIR}/ta
+    if [ ! -d ms-tpm-20-ref ]; then
+        log ">> ms-tpm-20-ref: not found. cloning .."
+        # ms_tpm_srcrev=98b60a44aba79b15fcce1c0d1e46cf5918400f6a
+        ms_tpm_srcrev=($(read_bsp_config ${bsp_version} ms_tpm_srcrev))
+
+        git clone https://github.com/psleng/ms-tpm-20-ref.git &>>"${LOG_FILE}"
+
+        cd ms-tpm-20-ref
+        git checkout ${ms_tpm_srcrev} &>>"${LOG_FILE}"
+        log ">> ms-tpm-20-ref: cloned"
+    else
+        log ">> ms-tpm-20-ref: already available"
+    fi
+    # PERLE copy updates for our build
+    # cp ${topdir}/updates/optee-os/ta/ms-tpm-20-ref/TPMCmd/tpm/include/* ${OPTEE_DIR}/ta/ms-tpm-20-ref/TPMCmd/tpm/include
+    MS_TPM_20_DIR=${OPTEE_DIR}/ta/ms-tpm-20-ref
+
+    cd ${topdir}/build/${build}/bsp_sources
 
     if [ ! -d ti-u-boot ]; then
         cd ${topdir}/build/${build}/bsp_sources
@@ -126,7 +186,6 @@ function build_optee() {
 machine=$1
 bsp_version=$2
 
-    cd ${OPTEE_DIR}
     platform=($(read_machine_config ${machine} optee_platform ${bsp_version}))
     make_args=($(read_machine_config ${machine} optee_make_args ${bsp_version}))
     # Workaround for toml not supporting empty values
@@ -134,8 +193,34 @@ bsp_version=$2
         make_args=""
     fi
 
+# PERLE added
+    cd ${OPTEE_CLIENT_DIR}
+    log "> optee_client: building .."
+    cmake -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc -DCMAKE_INSTALL_PREFIX=${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/usr &>>"${LOG_FILE}"
+    make -j`nproc` CROSS_COMPILE64=${cross_compile} PLATFORM=${platform} CFG_TEE_CLIENT_LOG_LEVEL=3 CFG_TEE_SUPP_LOG_LEVEL=3 CFG_TA_DEBUG=y CFG_ARM64_CORE=y \
+    ${make_args[*]} &>>"${LOG_FILE}"
+    make install &>>"${LOG_FILE}"
+
+    cd ${OPTEE_DIR}
     log "> optee: building .."
-    make -j`nproc` CROSS_COMPILE64=${cross_compile} CROSS_COMPILE=arm-none-linux-gnueabihf- PLATFORM=${platform} CFG_ARM64_core=y ${make_args[*]} &>>"${LOG_FILE}"
+
+# PERLE modified
+#    make -j`nproc` CROSS_COMPILE64=${cross_compile} CROSS_COMPILE=arm-none-linux-gnueabihf- PLATFORM=${platform} CFG_ARM64_core=y ${make_args[*]} &>>"${LOG_FILE}"
+
+    make -j`nproc` CROSS_COMPILE64=${cross_compile} CROSS_COMPILE=arm-none-linux-gnueabihf- PLATFORM=${platform} TA_DEV_KIT_DIR=${OPTEE_DIR} CFG_TEE_CORE_DEBUG=y \
+         CFG_TEE_TA_LOG_LEVEL=2 CFG_TA_MBEDTLS=y CFG_CRYPTO_SHA512=y CFG_CRYPTO_ECC=n CFG_MS_TPM_20_REF=${MS_TPM_20_DIR} BINARY=optee_ftpm CFG_ARM64_core=y \
+         CFG_RPMB_FS=n CFG_REE_FS=y ta-targets=ta_arm64 ${make_args[*]} &>>"${LOG_FILE}"
+
+# working REE_FS only      CFG_RPMB_FS=n CFG_REE_FS=y CFG_TEE_CORE_LOG_LEVEL=3 ta-targets=ta_arm64 ${make_args[*]} &>>"${LOG_FILE}"
+# working RPMB only        CFG_RPMB_FS=y CFG_REE_FS=n CFG_RPMB_TESTKEY=y CFG_RPMB_WRITE_KEY=y CFG_TEE_CORE_LOG_LEVEL=3 ta-targets=ta_arm64 ${make_args[*]} &>>"${LOG_FILE}"
+
+# PERLE added
+    log "> optee_ftpm: copying TA files to rootfs"
+    mkdir -p ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/usr/lib/firmware/optee &>> ${LOG_FILE}
+    cp ${OPTEE_DIR}/out/arm-plat-k3/export-ta_arm64/ta/*.ta ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/usr/lib/firmware/optee/ &>> ${LOG_FILE}
+    mkdir -p ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/udev/rules.d &>> ${LOG_FILE}
+    cp ${OPTEE_DIR}/optee_client/tee-supplicant/*.rules ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/udev/rules.d/ &>> ${LOG_FILE}
+    sudo cp ${topdir}/updates/openssl.cnf ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/ssl/openssl.cnf &>> ${LOG_FILE}
 }
 
 function build_uboot() {

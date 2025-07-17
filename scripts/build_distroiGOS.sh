@@ -30,8 +30,12 @@ bsp_version=$2
 
     mkdir -p ${topdir}/images/${build}
     cd ${topdir}/build/${build}
-    rm -rf tisdk-debian-${distro}-${bsp_version}-rootfs
-    cp -ra ../fs/ tisdk-debian-${distro}-${bsp_version}-rootfs
+
+# PERLE - do not remove the current rootfs, simple copy over the original bsp because
+#         optee .ta, tee-supplicant and other firmware are updated to the rootfs now 
+#    rm -rf tisdk-debian-${distro}-${bsp_version}-rootfs
+#    cp -ra ../fs/ tisdk-debian-${distro}-${bsp_version}-rootfs
+    cp -ra ../fs/* tisdk-debian-${distro}-${bsp_version}-rootfs/
 
     log "> Cleaning up ${build}"
 #    If we tar file system, it cause to be missing special file capabilities. (by Dennis Kong).

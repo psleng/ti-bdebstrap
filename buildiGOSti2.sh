@@ -154,9 +154,11 @@ do
     #generate_rootfs ${distro} ${distro_codename} ${machine} ${bsp_version}
 
     uboot=${topdir}/build/${distro}/tisdk-debian-${distro}-${bsp_version}-boot
-    if [ -d $uboot ]; then
-        echo "I: $0: skipping build_bsp since $uboot present"
+    ubootfile=$uboot/u-boot.img
+    if [ -f $ubootfile ]; then
+        echo "I: $0: skipping build_bsp since $ubootfile present"
     else
+        rm -rf $uboot
         echo "I: $0: running build_bsp ${distro} ${machine} ${bsp_version}"
         build_bsp ${distro} ${machine} ${bsp_version}
     fi

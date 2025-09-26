@@ -23,6 +23,7 @@ builds = [
     "bookworm-am64xx-evm",
     "bookworm-rt-am64xx-evm",
     "bookworm-j7200-evm",
+    "bookworm-imx8dxl-evm",
 ]
 
 # List of all valid trixie builds
@@ -129,5 +130,10 @@ builds = [
 
 [bookworm-j7200-evm]
     machine = "j7200-evm"
+    distro_codename = "bookworm"
+    rt_linux = "false"
+
+[bookworm-imx8dxl-evm]
+    machine = "imx8dxl-evm"
     distro_codename = "bookworm"
     rt_linux = "false"

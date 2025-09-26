@@ -8,6 +8,9 @@
 [bookworm-j7200-evm]
     bsp_version = "09.02.00.011"
 
+[bookworm-imx8dxl-evm]
+    bsp_version = "09.02.00.012"
+
 # BSP Configurations
 [10.01.08.02]
     atf_srcrev = "58b25570c9ef91753b14c2103f45f4be9dddb696"
@@ -35,3 +38,12 @@
     ms_tpm_srcrev = "psl-master"
     uboot_srcrev = "10.01.08"
     linux_fw_srcrev = "ti-linux-firmware"
+
+[09.02.00.012]
+    atf_srcrev = "00f1ec6b8740ccd403e641131e294aabacf2a48b"
+    optee_srcrev = "psl-master"
+    client_srcrev = "psl-master"
+    ftpm_srcrev = "psl-master"
+    ms_tpm_srcrev = "psl-master"
+    uboot_srcrev = "09.02.00.010"
+    linux_fw_srcrev = "09.02.00.010"

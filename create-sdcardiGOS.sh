@@ -48,7 +48,10 @@ EXEPATH="$PWD"/"$EXE"
 clear
 
 build=${1}
+fstype=${2}
 PARSEPATH=./images/${build}
+ISOPARSEPATH=./iso-images/${build}
+ISOBUILDPATH=./build/stage_iso
 
 cat << EOM
 
@@ -712,9 +715,16 @@ echo ""
 
 sync
 
-echo "Copying rootfs System partition"
+# PSL - add squashfs option that creates a iso type squashfs rootfs
+if [ "$fstype" = "squashfs" ] ; then
+echo "Copying squashed rootfs System partition"
+# copy to the sdcard as well
+cp -a $ISOPARSEPATH/stage_iso/. $PATH_TO_SDROOTFS
+else
+echo "Copying flat rootfs System partition"
 # rsync -aHAX $ROOTFSPATH $PATH_TO_SDROOTFS
 unsquashfs -d $PATH_TO_SDROOTFS $ROOTFILEPATH
+fi
 
 echo ""
 echo ""

@@ -8,6 +8,9 @@
 [bookworm-j7200-evm]
     bsp_version = "09.02.00.011"
 
+[bookworm-am64xx-iolan]
+    bsp_version = "09.02.00.010"
+
 # BSP Configurations
 [10.01.08.02]
     atf_srcrev = "58b25570c9ef91753b14c2103f45f4be9dddb696"

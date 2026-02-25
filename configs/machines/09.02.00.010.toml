@@ -53,3 +53,12 @@
     optee_make_args = "ta-targets=ta_arm64"
     uboot_r5_defconfig = "j7200_evm_r5_defconfig"
     uboot_a72_defconfig = "j7200_evm_a72_defconfig"
+
+[am64xx-iolan]
+    # u-boot config
+    atf_target_board = "lite"
+    atf_make_args="K3_PM_SYSTEM_SUSPEND=1"
+    optee_platform = "k3-am64x"
+    optee_make_args = "."
+    uboot_r5_defconfig = "am64x_iolan_r5_defconfig"
+    uboot_a53_defconfig = "am64x_iolan_a53_defconfig"

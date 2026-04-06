@@ -229,28 +229,73 @@ function build_uboot() {
 machine=$1
 bsp_version=$2
 
+    echo "Building uboot for machine variant: ${machine}"
+
     uboot_r5_defconfig=($(read_machine_config ${machine} uboot_r5_defconfig ${bsp_version}))
     uboot_r5_defconfig=`echo $uboot_r5_defconfig | tr ',' ' '`
     uboot_acore_defconfig=($(read_machine_config ${machine} uboot_${ARM_A_CORE}_defconfig ${bsp_version}))
     platform=($(read_machine_config ${machine} atf_target_board ${bsp_version}))
 
     cd ${UBOOT_DIR}
+
+    # set output for normal build
+    OUTDIR="${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-boot"
+
     log "> uboot-r5: building .."
     make -j`nproc` ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabihf- ${uboot_r5_defconfig} O=${UBOOT_DIR}/out/r5 &>>"${LOG_FILE}"
     make -j`nproc` ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabihf- O=${UBOOT_DIR}/out/r5 BINMAN_INDIRS=${FW_DIR} &>>"${LOG_FILE}"
-    cp ${UBOOT_DIR}/out/r5/tiboot3*.bin ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-boot/ &>> ${LOG_FILE}
+    cp ${UBOOT_DIR}/out/r5/tiboot3*.bin ${OUTDIR}/ &>> ${LOG_FILE}
 
     cd ${UBOOT_DIR}
     log "> uboot-${ARM_A_CORE}: building .."
     make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} ${uboot_acore_defconfig} O=${UBOOT_DIR}/out/${ARM_A_CORE} &>>"${LOG_FILE}"
     make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} BL31=${TFA_DIR}/build/k3/${platform}/release/bl31.bin TEE=${OPTEE_DIR}/out/arm-plat-k3/core/tee-pager_v2.bin BINMAN_INDIRS=${FW_DIR} O=${UBOOT_DIR}/out/${ARM_A_CORE} &>>"${LOG_FILE}"
-    cp ${UBOOT_DIR}/out/${ARM_A_CORE}/tispl.bin ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-boot/ &>> ${LOG_FILE}
-    cp ${UBOOT_DIR}/out/${ARM_A_CORE}/u-boot.img ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-boot/ &>> ${LOG_FILE}
+    cp ${UBOOT_DIR}/out/${ARM_A_CORE}/tispl.bin ${OUTDIR}/ &>> ${LOG_FILE}
+    cp ${UBOOT_DIR}/out/${ARM_A_CORE}/u-boot.img ${OUTDIR}/ &>> ${LOG_FILE}
 
 	case ${machine} in
 		am62pxx-evm | am62xx-evm | am62xx-lp-evm | am62xxsip-evm)
-			cp ${UBOOT_DIR}/tools/logos/ti_logo_414x97_32bpp.bmp.gz ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-boot/ &>> ${LOG_FILE}
+			cp ${UBOOT_DIR}/tools/logos/ti_logo_414x97_32bpp.bmp.gz ${OUTDIR}/ &>> ${LOG_FILE}
 			;;
 	esac
+
+    # PERLE - For the 2 evms, we need separate emmc output suffix and modify env file to use mmcdev 0 and fix loadbootenv bug
+    # PERLE - Patching would between bootloader builds would be more cumbersome. Our target would not need this cluge
+    case "$machine" in
+        am64xx-evm | j7200-evm)
+        # save original env file to restore later
+        cp board/ti/am64x/am64x.env board/ti/am64x/am64x.env.orig
+
+        echo "Building emmc uboot variant for machine type: ${machine}"
+        sed -i \
+          -e 's/^mmcdev=1$/mmcdev=0/' \
+          -e '/^bootpart=1:2$/ {
+                s//bootpart=0:2/
+                a loadbootenv=fatload mmc ${bootpart} ${loadaddr} ${bootenvfile}
+              }' \
+          board/ti/am64x/am64x.env
+        # save a copy of the change so we can compare .orig to .emmc, if debugging
+        cp board/ti/am64x/am64x.env board/ti/am64x/am64x.env.emmc
+
+        OUTDIR="${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-boot-emmc"
+
+        mkdir -p ${OUTDIR}
+
+        log "> uboot-r5: building .."
+        make -j`nproc` ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabihf- ${uboot_r5_defconfig} O=${UBOOT_DIR}/out/r5 &>>"${LOG_FILE}"
+        make -j`nproc` ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabihf- O=${UBOOT_DIR}/out/r5 BINMAN_INDIRS=${FW_DIR} &>>"${LOG_FILE}"
+        cp ${UBOOT_DIR}/out/r5/tiboot3*.bin ${OUTDIR}/ &>> ${LOG_FILE}
+
+        cd ${UBOOT_DIR}
+        log "> uboot-${ARM_A_CORE}: building .."
+        make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} ${uboot_acore_defconfig} O=${UBOOT_DIR}/out/${ARM_A_CORE} &>>"${LOG_FILE}"
+        make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} BL31=${TFA_DIR}/build/k3/${platform}/release/bl31.bin TEE=${OPTEE_DIR}/out/arm-plat-k3/core/tee-pager_v2.bin BINMAN_INDIRS=${FW_DIR} O=${UBOOT_DIR}/out/${ARM_A_CORE} &>>"${LOG_FILE}"
+        cp ${UBOOT_DIR}/out/${ARM_A_CORE}/tispl.bin ${OUTDIR}/ &>> ${LOG_FILE}
+        cp ${UBOOT_DIR}/out/${ARM_A_CORE}/u-boot.img ${OUTDIR}/ &>> ${LOG_FILE}
+
+        # restore original env file, if debugging.  Normally, the entire bsp_sources are removed
+        cp board/ti/am64x/am64x.env.orig board/ti/am64x/am64x.env
+        ;;
+    esac
 }
 

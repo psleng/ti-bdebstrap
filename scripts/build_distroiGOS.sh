@@ -54,6 +54,15 @@ bsp_version=$2
     mksquashfs tisdk-debian-${distro}-${bsp_version}-boot tisdk-debian-${distro}-${bsp_version}-boot.squashfs -comp xz -noappend &>>"${LOG_FILE}"
     mv tisdk-debian-${distro}-${bsp_version}-boot.squashfs ${topdir}/images/${build}
 
+# PERLE - squash and save emmc uboot for EVM boards with sdcard, where sdcard is the base and emmc boot is optional
+    EMMCDIR="tisdk-debian-${distro}-${bsp_version}-boot-emmc"
+
+    if [[ -d "$EMMCDIR" ]]; then
+        mksquashfs "$EMMCDIR" "${EMMCDIR}.squashfs" -comp xz -noappend &>>"${LOG_FILE}"
+        mv "${EMMCDIR}.squashfs" "${topdir}/images/${build}/"
+    fi
+
+# PERLE - comment out below for debugging: optee, ti-uboot, etc will build if source is left around
     rm -rf bsp_sources
 
     cd ${topdir}/build/

@@ -263,8 +263,17 @@ bsp_version=$2
     # PERLE - Patching would between bootloader builds would be more cumbersome. Our target would not need this cluge
     case "$machine" in
         am64xx-evm | j7200-evm)
+        # if not j7200, default to am642evm
+        if [ "$machine" = "j7200-evm" ]; then
+            ENV_PATH="board/ti/j721e"
+            ENV_NAME="j721e"
+        else
+            ENV_PATH="board/ti/am64x"
+            ENV_NAME="am64x"
+        fi
+
         # save original env file to restore later
-        cp board/ti/am64x/am64x.env board/ti/am64x/am64x.env.orig
+        cp ${ENV_PATH}/${ENV_NAME}.env ${ENV_PATH}/${ENV_NAME}.env.orig
 
         echo "Building emmc uboot variant for machine type: ${machine}"
         sed -i \
@@ -273,9 +282,9 @@ bsp_version=$2
                 s//bootpart=0:2/
                 a loadbootenv=fatload mmc ${bootpart} ${loadaddr} ${bootenvfile}
               }' \
-          board/ti/am64x/am64x.env
+          ${ENV_PATH}/${ENV_NAME}.env
         # save a copy of the change so we can compare .orig to .emmc, if debugging
-        cp board/ti/am64x/am64x.env board/ti/am64x/am64x.env.emmc
+        cp ${ENV_PATH}/${ENV_NAME}.env ${ENV_PATH}/${ENV_NAME}.env.emmc
 
         OUTDIR="${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-boot-emmc"
 
@@ -294,7 +303,7 @@ bsp_version=$2
         cp ${UBOOT_DIR}/out/${ARM_A_CORE}/u-boot.img ${OUTDIR}/ &>> ${LOG_FILE}
 
         # restore original env file, if debugging.  Normally, the entire bsp_sources are removed
-        cp board/ti/am64x/am64x.env.orig board/ti/am64x/am64x.env
+        cp ${ENV_PATH}/${ENV_NAME}.env.orig ${ENV_PATH}/${ENV_NAME}.env
         ;;
     esac
 }

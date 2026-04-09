@@ -2086,7 +2086,7 @@ new file mode 100755
 index 00000000000..88a34abda49
 --- /dev/null
 +++ b/board/ti/iolan/iolan.env
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,59 @@
 +#include <environment/ti/ti_armv7_common.env>
 +#include <environment/ti/mmc.env>
 +#include <environment/ti/k3_dfu_combined.env>
@@ -2108,8 +2108,9 @@ index 00000000000..88a34abda49
 +
 +boot=mmc
 +mmcdev=0
-+bootpart=0:1
++bootpart=0:2
 +bootdir=/boot
++loadbootenv=fatload mmc ${bootpart} ${loadaddr} ${bootenvfile}
 +rd_spec=-
 +
 +rproc_fw_binaries= 0 /lib/firmware/am64-main-r5f0_0-fw 1 /lib/firmware/am64-main-r5f0_1-fw

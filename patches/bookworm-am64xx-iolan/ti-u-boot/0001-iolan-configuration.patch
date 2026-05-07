@@ -321,7 +321,7 @@ new file mode 100755
 index 00000000000..d0597edbc80
 --- /dev/null
 +++ b/arch/arm/dts/k3-am642-iolan.dts
-@@ -0,0 +1,475 @@
+@@ -0,0 +1,476 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Copyright (C) 2020-2021 Texas Instruments Incorporated - https://www.ti.com/
@@ -532,6 +532,7 @@ index 00000000000..d0597edbc80
 +	/* Digital IOs */
 +	main_gpio1_digital_pins: main-gpio1-digital-pins {
 +		pinctrl-single,pins = <
++			AM64X_IOPAD(0x01F0, PIN_INPUT_PULLUP,   7) /* (AA4) PRG0_PRU1_GPO16 => GPIO1_36/pin 123 (PUSH_KEY) */
 +			AM64X_IOPAD(0x0208, PIN_OUTPUT, 7) /* (D12) GPIO1_42 => SPI0_CS0 */
 +			AM64X_IOPAD(0x020C, PIN_OUTPUT, 7) /* (C13) GPIO1_43 => SPI0_CS1 */
 +			AM64X_IOPAD(0x0210, PIN_OUTPUT, 7) /* (D13) GPIO1_44 => SPI0_CLK */
@@ -1806,8 +1807,8 @@ index 00000000000..e990ba0d43e
 +#ifdef CONFIG_TI_I2C_BOARD_DETECT
 +int do_board_detect(void)
 +{
-+	int ret;
-+
++	int ret = 1;
++#if 0  // PERLE - do not read eeprom. Note: Setting CONFIG_TI_I2C_BOARD_DETECT to 'not set', breaks the build
 +	ret = ti_i2c_eeprom_am6_get_base(CONFIG_EEPROM_BUS_ADDRESS,
 +					 CONFIG_EEPROM_CHIP_ADDRESS);
 +	if (ret) {
@@ -1819,7 +1820,7 @@ index 00000000000..e990ba0d43e
 +			pr_err("Reading on-board EEPROM at 0x%02x failed %d\n",
 +			       CONFIG_EEPROM_CHIP_ADDRESS + 1, ret);
 +	}
-+
++#endif
 +	return ret;
 +}
 +
@@ -4720,7 +4721,7 @@ index 00000000000..22ccaba7252
 +# CONFIG_CMD_FPGAD is not set
 +# CONFIG_CMD_FUSE is not set
 +CONFIG_CMD_GPIO=y
-+# CONFIG_CMD_GPIO_READ is not set
++CONFIG_CMD_GPIO_READ=y
 +CONFIG_CMD_GPT=y
 +CONFIG_RANDOM_UUID=y
 +# CONFIG_CMD_GPT_RENAME is not set
@@ -5216,7 +5217,7 @@ index 00000000000..22ccaba7252
 +# CONFIG_AT91_GPIO is not set
 +# CONFIG_ATMEL_PIO4 is not set
 +# CONFIG_ASPEED_GPIO is not set
-+# CONFIG_DA8XX_GPIO is not set
++CONFIG_DA8XX_GPIO=y
 +# CONFIG_FXL6408_GPIO is not set
 +# CONFIG_HIKEY_GPIO is not set
 +# CONFIG_INTEL_BROADWELL_GPIO is not set

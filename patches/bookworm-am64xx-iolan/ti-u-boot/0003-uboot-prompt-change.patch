@@ -1,0 +1,26 @@
+diff --git a/configs/am64x_iolan_a53_defconfig b/configs/am64x_iolan_a53_defconfig
+index 15a865bef47..d39491c400e 100644
+--- a/configs/am64x_iolan_a53_defconfig
++++ b/configs/am64x_iolan_a53_defconfig
+@@ -221,7 +221,7 @@ CONFIG_DM_GPIO=y
+ CONFIG_SPL_DM_SPI=y
+ CONFIG_DEFAULT_DEVICE_TREE="k3-am642-iolan"
+ CONFIG_SPL_TEXT_BASE=0x80080000
+-CONFIG_SYS_PROMPT="IOLAN-2A > "
++CONFIG_SYS_PROMPT="PERLE > "
+ CONFIG_MULTI_DTB_FIT_UNCOMPRESS_SZ=0x8000
+ CONFIG_DM_RESET=y
+ CONFIG_SPL_MMC=y
+diff --git a/configs/am64x_iolan_r5_defconfig b/configs/am64x_iolan_r5_defconfig
+index c2da37685ec..2eba1d9ac13 100644
+--- a/configs/am64x_iolan_r5_defconfig
++++ b/configs/am64x_iolan_r5_defconfig
+@@ -222,7 +222,7 @@ CONFIG_DM_GPIO=y
+ CONFIG_SPL_DM_SPI=y
+ CONFIG_DEFAULT_DEVICE_TREE="k3-am642-r5-iolan"
+ CONFIG_SPL_TEXT_BASE=0x70000000
+-CONFIG_SYS_PROMPT="IOLAN-2A > "
++CONFIG_SYS_PROMPT="PERLE > "
+ CONFIG_MULTI_DTB_FIT_UNCOMPRESS_SZ=0x8000
+ CONFIG_DM_RESET=y
+ CONFIG_SPL_MMC=y

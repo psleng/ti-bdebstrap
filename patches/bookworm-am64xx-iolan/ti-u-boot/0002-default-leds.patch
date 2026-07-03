@@ -1,0 +1,755 @@
+diff --git a/arch/arm/dts/k3-am642-iolan-u-boot.dtsi b/arch/arm/dts/k3-am642-iolan-u-boot.dtsi
+old mode 100755
+new mode 100644
+index 95fb5b7dc6d..3e6156b3e4c
+--- a/arch/arm/dts/k3-am642-iolan-u-boot.dtsi
++++ b/arch/arm/dts/k3-am642-iolan-u-boot.dtsi
+@@ -7,7 +7,7 @@
+ 
+ / {
+ 	chosen {
+-		stdout-path = "serial2:115200n8";
++		stdout-path = "serial0:115200n8";
+ 		tick-timer = &timer1;
+ 	};
+ 
+@@ -80,82 +80,11 @@
+ 
+ &main_pmx0 {
+ 	bootph-pre-ram;
+-	main_i2c0_pins_default: main-i2c0-pins-default {
+-		bootph-pre-ram;
+-		pinctrl-single,pins = <
+-			AM64X_IOPAD(0x0260, PIN_INPUT_PULLUP, 0) /* (A18) I2C0_SCL */
+-			AM64X_IOPAD(0x0264, PIN_INPUT_PULLUP, 0) /* (B18) I2C0_SDA */
+-		>;
+-	};
++	bootph-initial-initialized;
+ };
+ 
+ &main_i2c0 {
+-	status = "okay";
+ 	bootph-pre-ram;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&main_i2c0_pins_default>;
+-	clock-frequency = <400000>;
+-
+-	tps65219: pmic@30 {
+-		compatible = "ti,tps65219";
+-		reg = <0x30>;
+-
+-		regulators {
+-			buck1_reg: buck1 {
+-				regulator-name = "VDD_CORE";
+-				regulator-min-microvolt = <750000>;
+-				regulator-max-microvolt = <750000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-
+-			buck2_reg: buck2 {
+-				regulator-name = "VCC1V8";
+-				regulator-min-microvolt = <1800000>;
+-				regulator-max-microvolt = <1800000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-
+-			buck3_reg: buck3 {
+-				regulator-name = "VDD_LPDDR4";
+-				regulator-min-microvolt = <1100000>;
+-				regulator-max-microvolt = <1100000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-
+-			ldo1_reg: ldo1 {
+-				regulator-name = "VDDSHV_SD_IO_PMIC";
+-				regulator-min-microvolt = <3300000>;
+-				regulator-max-microvolt = <3300000>;
+-			};
+-
+-			ldo2_reg: ldo2 {
+-				regulator-name = "VDDAR_CORE";
+-				regulator-min-microvolt = <850000>;
+-				regulator-max-microvolt = <850000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-
+-			ldo3_reg: ldo3 {
+-				regulator-name = "VDDA_1V8";
+-				regulator-min-microvolt = <1800000>;
+-				regulator-max-microvolt = <1800000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-
+-			ldo4_reg: ldo4 {
+-				regulator-name = "VDD_PHY_2V5";
+-				regulator-min-microvolt = <2500000>;
+-				regulator-max-microvolt = <2500000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-		};
+-	};
+ };
+ 
+ &main_uart0 {
+@@ -290,8 +219,37 @@
+ 
+ &main_gpio0 {
+ 	bootph-pre-ram;
++	bootph-initial-initialized;
++	led_sys_red {
++		bootph-initial-initialized;
++	};
++	led_sys_blue {
++		bootph-initial-initialized;
++	};
++	led_sys_green {
++		bootph-initial-initialized;
++	};
++	led_lte_red {
++		bootph-initial-initialized;
++	};
++	led_lte_blue {
++		bootph-initial-initialized;
++	};
++	led_lte_green {
++		bootph-initial-initialized;
++	};
++	led_wifi_red {
++		bootph-initial-initialized;
++	};
++	led_wifi_blue {
++		bootph-initial-initialized;
++	};
++	led_wifi_green {
++		bootph-initial-initialized;
++	};
+ };
+ 
+ &main_gpio1 {
+ 	bootph-pre-ram;
++	bootph-initial-initialized;
+ };
+diff --git a/arch/arm/dts/k3-am642-iolan.dts b/arch/arm/dts/k3-am642-iolan.dts
+old mode 100755
+new mode 100644
+index 57eb66617d8..d49a9026827
+--- a/arch/arm/dts/k3-am642-iolan.dts
++++ b/arch/arm/dts/k3-am642-iolan.dts
+@@ -17,13 +17,13 @@
+ 	model = "Perle AM6412 IOLAN";
+ 
+ 	chosen {
+-		stdout-path = "serial2:115200n8";
+-		bootargs = "console=ttyS2,115200n8 earlycon=ns16550a,mmio32,0x02830000";
++		stdout-path = "serial0:115200n8";
++		bootargs = "console=ttyS0,115200n8 earlycon=ns16550a,mmio32,0x02830000";
+ 	};
+ 
+     aliases {
+-        serial2   = &main_uart3;
+-        serial5   = &main_uart0;
++        serial0   = &main_uart3;
++        serial1   = &main_uart0;
+ 
+         ethernet0 = &cpsw_port2;
+ 
+@@ -36,7 +36,6 @@
+ 		device_type = "memory";
+ 		/* 2G RAM */
+ 		reg = <0x00000000 0x80000000 0x00000000 0x80000000>;
+-
+ 	};
+ 
+ 	reserved-memory {
+@@ -62,18 +61,6 @@
+ 			no-map;
+ 		};
+ 
+-		main_r5fss0_core1_dma_memory_region: r5f-dma-memory@a1000000 {
+-			compatible = "shared-dma-pool";
+-			reg = <0x00 0xa1000000 0x00 0x100000>;
+-			no-map;
+-		};
+-
+-		main_r5fss0_core1_memory_region: r5f-memory@a1100000 {
+-			compatible = "shared-dma-pool";
+-			reg = <0x00 0xa1100000 0x00 0xf00000>;
+-			no-map;
+-		};
+-
+ 		rtos_ipc_memory_region: ipc-memories@a5000000 {
+ 			reg = <0x00 0xa5000000 0x00 0x00800000>;
+ 			alignment = <0x1000>;
+@@ -81,100 +68,40 @@
+ 		};
+ 	};
+ 
+-	vusb_main: fixed-regulator-vusb-main5v0 {
+-		/* USB MAIN INPUT 5V DC */
++	/* Module Power Supply */
++	reg_vsodimm: regulator-vsodimm {
+ 		compatible = "regulator-fixed";
+-		regulator-name = "vusb_main5v0";
+-		regulator-min-microvolt = <5000000>;
+-		regulator-max-microvolt = <5000000>;
+-		regulator-always-on;
+-		regulator-boot-on;
++		regulator-name = "+V_SODIMM";
+ 	};
+ 
+-	vcc_3v3_sys: fixedregulator-vcc-3v3-sys {
+-		/* output of LP8733xx */
++	/* Non PMIC On-module Supplies */
++	reg_3v3: regulator-3v3 {
+ 		compatible = "regulator-fixed";
+-		regulator-name = "vcc_3v3_sys";
+-		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+-		vin-supply = <&vusb_main>;
+-		regulator-always-on;
+-		regulator-boot-on;
++		regulator-min-microvolt = <3300000>;
++		regulator-name = "On-module +V3.3";
++		vin-supply = <&reg_vsodimm>;
+ 	};
+ 
+ 	leds {
+ 		compatible = "gpio-leds";
+-
+-		led-0 {
+-			color = <LED_COLOR_ID_GREEN>;
+-			function = LED_FUNCTION_INDICATOR;
+-			function-enumerator = <1>;
+-			gpios = <&main_gpio0 46 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO1 (U8) */
+-			default-state = "off";
+-		};
+-
+-		led-1 {
+-			color = <LED_COLOR_ID_BLUE>;
+-			function = LED_FUNCTION_INDICATOR;
+-			function-enumerator = <2>;
+-			gpios = <&main_gpio0 57 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO12 (U9) */
++		led-uart0-tx {
++			label = "uart0:tx";
++			color = <LED_COLOR_ID_YELLOW>;
++			function = LED_FUNCTION_TX;
++			gpios = <&main_gpio0 4 GPIO_ACTIVE_HIGH>;	/* OSPI0_D1 (M18) */
+ 			default-state = "off";
++			linux,default-trigger = "tty";
++			trigger-sources = <&main_uart0>;
+ 		};
+-
+-		led-2 {
+-			color = <LED_COLOR_ID_RED>;
+-			function = LED_FUNCTION_INDICATOR;
+-			function-enumerator = <3>;
+-			gpios = <&main_gpio0 62 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO17 (U7) */
+-			default-state = "off";
+-		};
+-
+-		led-3 {
+-			color = <LED_COLOR_ID_GREEN>;
+-			function = LED_FUNCTION_INDICATOR;
+-			function-enumerator = <4>;
+-			gpios = <&main_gpio0 47 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO2 (W8) */
+-			default-state = "off";
+-		};
+-
+-		led-4 {
+-			color = <LED_COLOR_ID_BLUE>;
+-			function = LED_FUNCTION_INDICATOR;
+-			function-enumerator = <5>;
+-			gpios = <&main_gpio0 58 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO13 (W9) */
+-			default-state = "off";
+-		};
+-
+-		led-5 {
+-			color = <LED_COLOR_ID_RED>;
+-			function = LED_FUNCTION_INDICATOR;
+-			function-enumerator = <6>;
+-			gpios = <&main_gpio0 64 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO19 (W7) */
+-			default-state = "off";
+-		};
+-
+-		led-6 {
+-			color = <LED_COLOR_ID_GREEN>;
+-			function = LED_FUNCTION_INDICATOR;
+-			function-enumerator = <7>;
+-			gpios = <&main_gpio0 48 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO3 (V8) */
+-			default-state = "off";
+-		};
+-
+-		led-7 {
+-			color = <LED_COLOR_ID_BLUE>;
+-			function = LED_FUNCTION_INDICATOR;
+-			function-enumerator = <8>;
+-			gpios = <&main_gpio0 61 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO16 (V9) */
+-			default-state = "off";
+-		};
+-
+-		led-8 {
+-			color = <LED_COLOR_ID_RED>;
+-			function = LED_FUNCTION_INDICATOR;
+-			function-enumerator = <9>;
+-			gpios = <&main_gpio0 63 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO16 (V7) */
++		led-uart0-rx {
++			label = "uart0:rx";
++			color = <LED_COLOR_ID_YELLOW>;
++			function = LED_FUNCTION_RX;
++			gpios = <&main_gpio0 5 GPIO_ACTIVE_HIGH>;	/* OSPI0_D2 (M20) */
+ 			default-state = "off";
++			linux,default-trigger = "tty";
++			trigger-sources = <&main_uart0>;
+ 		};
+ 	};
+ };
+@@ -182,47 +109,112 @@
+ &main_pmx0 {
+ 	main_uart0_pins_default: main-uart0-pins-default {
+ 		pinctrl-single,pins = <
+-			AM64X_IOPAD(0x0238, PIN_INPUT, 0) /* (B16) UART0_CTSn */
+-			AM64X_IOPAD(0x023c, PIN_OUTPUT, 0) /* (A16) UART0_RTSn */
+-			AM64X_IOPAD(0x0230, PIN_INPUT, 0) /* (D15) UART0_RXD */
+-			AM64X_IOPAD(0x0234, PIN_OUTPUT, 0) /* (C16) UART0_TXD */
++			AM64X_IOPAD(0x0230, PIN_INPUT_PULLUP, 0)    /* (D15) UART0_RXD */
++			AM64X_IOPAD(0x0234, PIN_OUTPUT, 0)          /* (C16) UART0_TXD */
++			AM64X_IOPAD(0x0238, PIN_INPUT_PULLUP, 0)    /* (B16) UART0_CTSn */
++			AM64X_IOPAD(0x023c, PIN_OUTPUT, 0)          /* (A16) UART0_RTSn */
+ 		>;
+ 	};
+ 
+ 	main_uart3_pins_default: main-uart3-pins-default {
+ 		pinctrl-single,pins = <
+- 			AM64X_IOPAD(0x0188, PIN_INPUT_PULLUP, 10) /* (AA5) UART3_RXD */
+- 			AM64X_IOPAD(0x0170, PIN_OUTPUT, 10)       /* (AA2) UART3_TXD */
++ 			AM64X_IOPAD(0x0188, PIN_INPUT_PULLUP, 10)   /* (AA5) UART3_RXD */
++ 			AM64X_IOPAD(0x0170, PIN_OUTPUT, 10)         /* (AA2) UART3_TXD */
+ 		>;
+ 	};
+ 
+-	/* Digital IOs */
+-	main_gpio0_digital_pins: main-gpio0-digital-pins {
++	main_i2c0_pins_default: main-i2c0-pins-default {
+ 		pinctrl-single,pins = <
+-			AM64X_IOPAD(0x0030, PIN_OUTPUT, 7) /* (L18) GPIO0_12 - OSPI0_CSN1 => UARTLED5.TX */
+-			AM64X_IOPAD(0x0034, PIN_INPUT, 7)  /* (K17) GPIO0_13 - OSPI0_CSN2 => UARTLED5.RX */
+-			AM64X_IOPAD(0x0088, PIN_OUTPUT, 7) /* (R18) GPIO0_33 - VPP_LDO_EN => GPMC0_OEN_REN */
++			AM64X_IOPAD(0x0260, PIN_INPUT_PULLUP, 0)    /* (A18) I2C0_SCL */
++			AM64X_IOPAD(0x0264, PIN_INPUT_PULLUP, 0)    /* (B18) I2C0_SDA */
+ 		>;
+ 	};
+ 
+ 	/* Digital IOs */
+-	main_gpio1_digital_pins: main-gpio1-digital-pins {
++	main_gpio0_digital_pins: main-gpio0-digital-pins {
+ 		pinctrl-single,pins = <
+-			AM64X_IOPAD(0x01F0, PIN_INPUT_PULLUP,   7) /* (AA4) PRG0_PRU1_GPO16 => GPIO1_36/pin 123 (PUSH_KEY) */
+-			AM64X_IOPAD(0x0208, PIN_OUTPUT, 7) /* (D12) GPIO1_42 => SPI0_CS0 */
+-			AM64X_IOPAD(0x020C, PIN_OUTPUT, 7) /* (C13) GPIO1_43 => SPI0_CS1 */
+-			AM64X_IOPAD(0x0210, PIN_OUTPUT, 7) /* (D13) GPIO1_44 => SPI0_CLK */
+-			AM64X_IOPAD(0x0214, PIN_OUTPUT, 7) /* (A13) GPIO1_45 => SPI0_D0 */
+-			AM64X_IOPAD(0x0218, PIN_OUTPUT, 7) /* (A14) GPIO1_46 => SPI0_D1 */
+-			AM64X_IOPAD(0x0224, PIN_OUTPUT, 7) /* (C14) GPIO1_49 => SPI1_CLK */
+-			AM64X_IOPAD(0x0228, PIN_OUTPUT, 7) /* (B15) GPIO1_50 => SPI1_D0 */
++			AM64X_IOPAD(0x0010, PIN_OUTPUT_PULLDOWN,7) /* (M18) OSPI0_D1         => GPIO0_4  (UARTLED0.TX)               */
++			AM64X_IOPAD(0x0014, PIN_OUTPUT_PULLDOWN,7) /* (M20) OSPI0_D2         => GPIO0_5  (UARTLED0.RX)               */
++			AM64X_IOPAD(0x0018, PIN_OUTPUT_PULLDOWN,7) /* (M21) OSPI0_D3         => GPIO0_6  (UARTLED2.TX)               */
++			AM64X_IOPAD(0x001C, PIN_OUTPUT_PULLDOWN,7) /* (P21) OSPI0_D4         => GPIO0_7  (UARTLED2.RX)               */
++			AM64X_IOPAD(0x0020, PIN_OUTPUT_PULLDOWN,7) /* (P20) OSPI0_D5         => GPIO0_8  (UARTLED4.TX)               */
++			AM64X_IOPAD(0x0024, PIN_OUTPUT_PULLDOWN,7) /* (N18) OSPI0_D6         => GPIO0_9  (UARTLED4.RX)               */
++			AM64X_IOPAD(0x0030, PIN_OUTPUT_PULLDOWN,7) /* (L18) OSIP0_CSn1       => GPIO0_12 (UARTLED5.TX)               */
++			AM64X_IOPAD(0x0034, PIN_OUTPUT_PULLDOWN,7) /* (K17) OSPI0_CSn2       => GPIO0_13 (UARTLED5.RX)               */
++			AM64X_IOPAD(0x00A4, PIN_INPUT_PULLUP,   7) /* (N17) GPMC0_DIR        => GPIO0_40 (UARTC2.MODE0)              */
++			AM64X_IOPAD(0x00B4, PIN_INPUT_PULLUP,   7) /* (R21) GPMC0_CSn3       => GPIO0_44 (UARTC2.MODE1)              */
++			AM64X_IOPAD(0x0084, PIN_INPUT_PULLUP,   7) /* (P16) GPMC0_ADVn_ALE   => GPIO0_32 (UARTC2.MODE2)              */
++			AM64X_IOPAD(0x00A8, PIN_INPUT_PULLDOWN, 7) /* (R19) GPMC0_CSn0       => GPIO0_41 (UARTC2.TERM_TX)            */
++			AM64X_IOPAD(0x00AC, PIN_INPUT_PULLDOWN, 7) /* (R20) GPMC0_CSn1       => GPIO0_42 (UARTC2.TERM_RX)            */
++			AM64X_IOPAD(0x0090, PIN_INPUT_PULLUP,   7) /* (P17) GPMC0_BE0n_CLE   => GPIO0_35 (UARTC2.SLR)                */
++			AM64X_IOPAD(0x0094, PIN_INPUT_PULLDOWN, 7) /* (T19) GPMC0_BE1n       => GPIO0_36 (UARTC2.SHUT_N)             */
++			AM64X_IOPAD(0x00FC, PIN_INPUT_PULLUP,   7) /* (U7)  PRG1_PRU0_GPO17  => GPIO0_62 (STAT_SYS.RED)              */
++			AM64X_IOPAD(0x00BC, PIN_INPUT_PULLDOWN, 7) /* (U8)  PRG1_PRU0_GPO1   => GPIO0_46 (STAT_SYS.BLUE)             */
++			AM64X_IOPAD(0x00E8, PIN_INPUT_PULLDOWN, 7) /* (U9)  PRG1_PRU0_GPO12  => GPIO0_57 (STAT_SYS.GREEN)            */
++			AM64X_IOPAD(0x0100, PIN_INPUT_PULLUP,   7) /* (V7)  PRG1_PRU0_GPO18  => GPIO0_63 (STAT_LTE.RED)              */
++			AM64X_IOPAD(0x00C4, PIN_INPUT_PULLDOWN, 7) /* (V8)  PRG1_PRU0_GPO3   => GPIO0_48 (STAT_LTE.BLUE)             */
++			AM64X_IOPAD(0x00F8, PIN_INPUT_PULLDOWN, 7) /* (V9)  PRG1_PRU0_GPO16  => GPIO0_61 (STAT_LTE.GREEN)            */
++			AM64X_IOPAD(0x0104, PIN_INPUT_PULLUP,   7) /* (W7)  PRG1_PRU0_GPO19  => GPIO0_64 (STAT_WIFI.RED)             */
++			AM64X_IOPAD(0x00C0, PIN_INPUT_PULLDOWN, 7) /* (W8)  PRG1_PRU0_GPO2   => GPIO0_47 (STAT_WIFI.BLUE)            */
++			AM64X_IOPAD(0x00EC, PIN_INPUT_PULLDOWN, 7) /* (W9)  PRG1_PRU0_GPO13  => GPIO0_58 (STAT_WIFI.GREEN)           */
++			AM64X_IOPAD(0x0038, PIN_INPUT_PULLUP,   7) /* (L17) OSPI0_CSn3       => GPIO0_14 (WIFI_PDN_GPIO)             */
++			AM64X_IOPAD(0x0088, PIN_INPUT_PULLDOWN, 7) /* (R18) GPMC0_OEn_REn    => GPIO0_33 (VPP_LDO_EN)                */
++			AM64X_IOPAD(0x0098, PIN_INPUT_PULLDOWN, 7) /* (W19) GPMC0_WAIT0      => GPIO0_37 (PATH_THROUGH_SEL)          */
++			AM64X_IOPAD(0x00B8, PIN_INPUT_PULLUP,   7) /* (Y7)  PRG1_PRU0_GPO0   => GPIO0_45 (VSEL_SD_SWITCH)            */
++			AM64X_IOPAD(0x00D4, PIN_INPUT_PULLUP,   7) /* (U13) PRG1_PRU0_GPO7   => GPIO0_52 (SIM1_DETECT)               */
++			AM64X_IOPAD(0x00C8, PIN_INPUT_PULLUP,   7) /* (Y8)  PRG1_PRU0_GPO4   => GPIO0_49 (SIM2_DETECT)               */
++			AM64X_IOPAD(0x00F4, PIN_INPUT_PULLDOWN, 7) /* (Y9)  PRG1_PRU0_GPO15  => GPIO0_60 (SIM_SELECT1N_2)            */
++			AM64X_IOPAD(0x00D0, PIN_INPUT_PULLUP,   7) /* (AA7) PRG1_PRU0_GPO6   => GPIO0_51 (PMIC_STBY)                 */
++			AM64X_IOPAD(0x00E4, PIN_INPUT_PULLUP,   7) /* (AA8) PRG1_PRU0_GPO11  => GPIO0_56 (CELL_SHUTDOWN_N)           */
++			AM64X_IOPAD(0x00F0, PIN_INPUT_PULLDOWN, 7) /* (AA9) PRG1_PRU0_GPO14  => GPIO0_59 (CELL_UNCONDITIONAL_RESET)  */
++			AM64X_IOPAD(0x0158, PIN_INPUT_PULLDOWN, 7) /* (AA6) PRG1_MDIO0_MDIO  => GPIO0_85 (CELL_FLIGHT_MODE)          */
++			AM64X_IOPAD(0x015C, PIN_INPUT_PULLDOWN, 7) /* (Y6)  PRG1_MDIO0_MDC   => GPIO0_86 (CELL_GNSS_DISABLE)         */
+ 		>;
+ 	};
+ 
+-	main_i2c0_pins_default: main-i2c0-pins-default {
++	/* Digital IOs */
++	main_gpio1_digital_pins: main-gpio1-digital-pins {
+ 		pinctrl-single,pins = <
+-			AM64X_IOPAD(0x0260, PIN_INPUT_PULLUP, 0) /* (A18) I2C0_SCL */
+-			AM64X_IOPAD(0x0264, PIN_INPUT_PULLUP, 0) /* (B18) I2C0_SDA */
++			AM64X_IOPAD(0x0160, PIN_INPUT_PULLUP,   7) /* (Y1)  PRG0_PRU0_GPO0   => GPIO1_0  (UARTD5.DCD)                */
++			AM64X_IOPAD(0x016C, PIN_INPUT_PULLUP,   7) /* (V2)  PRG0_PRU0_GPO3   => GPIO1_3  (UARTD5.DSR)                */
++			AM64X_IOPAD(0x01A8, PIN_OUTPUT_PULLUP,  7) /* (V1)  PRG0_PRU0_GPO18  => GPIO1_18 (UARTD5.DTR)                */
++			AM64X_IOPAD(0x01AC, PIN_INPUT_PULLUP,   7) /* (W1)  PRG0_PRU0_GPO19  => GPIO1_19 (UARTD5.RI)                 */
++			AM64X_IOPAD(0x0174, PIN_INPUT_PULLUP,   7) /* (R3)  PRG0_PRU0_GPO5   => GPIO1_5  (UARTC4.MODE0)              */
++			AM64X_IOPAD(0x0164, PIN_INPUT_PULLUP,   7) /* (R4)  PRG0_PRU0_GPO1   => GPIO1_1  (UARTC4.MODE1)              */
++			AM64X_IOPAD(0x01C8, PIN_INPUT_PULLUP,   7) /* (R5)  PRG0_PRU1_GPO6   => GPIO1_26 (UARTC4.MODE2)              */
++			AM64X_IOPAD(0x0204, PIN_INPUT_PULLDOWN, 7) /* (P3)  PRG0_MDIO0_MDC   => GPIO1_41 (UARTC4.TERM_TX)            */
++			AM64X_IOPAD(0x0200, PIN_INPUT_PULLDOWN, 7) /* (P2)  PRG0_MDIO0_MDIO  => GPIO1_40 (UARTC4.TERM_RX)            */
++			AM64X_IOPAD(0x0194, PIN_INPUT_PULLUP,   7) /* (R6)  PRG0_PRU0_GPO13  => GPIO1_13 (UARTC4.SLR)                */
++			AM64X_IOPAD(0x01E4, PIN_INPUT_PULLDOWN, 7) /* (T6)  PRG0_PRU1_GPO13  => GPIO1_33 (UARTC4.SHUT_N)             */
++			AM64X_IOPAD(0x0168, PIN_INPUT_PULLUP,   7) /* (U2)  PRG0_PRU0_GPO2   => GPIO1_2  (UARTD4.DCD)                */
++			AM64X_IOPAD(0x017C, PIN_INPUT_PULLUP,   7) /* (T1)  PRG0_PRU0_GPO7   => GPIO1_7  (UARTD4.DSR)                */
++			AM64X_IOPAD(0x01A4, PIN_OUTPUT_PULLUP,  7) /* (U1)  PRG0_PRU0_GPO17  => GPIO1_17 (UARTD4.DTR)                */
++			AM64X_IOPAD(0x01D0, PIN_INPUT_PULLUP,   7) /* (R1)  PRG0_PRU1_GPO8   => GPIO1_28 (UARTD4.RI)                 */
++			AM64X_IOPAD(0x019C, PIN_INPUT_PULLUP,   7) /* (T5)  PRG0_PRU0_GPO15  => GPIO1_15 (UARTC5.MODE0)              */
++			AM64X_IOPAD(0x01EC, PIN_INPUT_PULLUP,   7) /* (U5)  PRG0_PRU1_GPO15  => GPIO1_35 (UARTC5.MODE1)              */
++			AM64X_IOPAD(0x01F4, PIN_INPUT_PULLUP,   7) /* (V5)  PRG0_PRU1_GPO17  => GPIO1_37 (UARTC5.MODE2)              */
++			AM64X_IOPAD(0x0198, PIN_INPUT_PULLDOWN, 7) /* (V4)  PRG0_PRU0_GPO14  => GPIO1_14 (UARTC5.TERM_TX)            */
++			AM64X_IOPAD(0x01A0, PIN_INPUT_PULLDOWN, 7) /* (U4)  PRG0_PRU0_GPO16  => GPIO1_16 (UARTC5.TERM_RX)            */
++			AM64X_IOPAD(0x01D8, PIN_INPUT_PULLUP,   7) /* (V6)  PRG0_PRU1_GPO10  => GPIO1_30 (UARTC5.SLR)                */
++			AM64X_IOPAD(0x0184, PIN_INPUT_PULLDOWN, 7) /* (W6)  PRG0_PRU0_GPO9   => GPIO1_9  (UARTC5.SHUT_N)             */
++			AM64X_IOPAD(0x01F0, PIN_INPUT_PULLUP,   7) /* (AA4) PRG0_PRU1_GPO16  => GPIO1_36 (PUSH_KEY)                  */
++			AM64X_IOPAD(0x0218, PIN_INPUT_PULLUP,   7) /* (A14) SPI0_D1          => GPIO1_46 (UARTC.MODE0)               */
++			AM64X_IOPAD(0x0208, PIN_INPUT_PULLUP,   7) /* (D12) SPI0_CS0         => GPIO1_42 (UARTC.MODE1)               */
++			AM64X_IOPAD(0x020C, PIN_INPUT_PULLUP,   7) /* (C13) SPI0_CS1         => GPIO1_43 (UARTC.MODE2)               */
++			AM64X_IOPAD(0x0210, PIN_INPUT_PULLDOWN, 7) /* (D13) SPI0_CLK         => GPIO1_44 (UARTC.TERM_TX)             */
++			AM64X_IOPAD(0x0214, PIN_INPUT_PULLDOWN, 7) /* (A13) SPI0_D0          => GPIO1_45 (UARTC.TERM_RX)             */
++			AM64X_IOPAD(0x0224, PIN_INPUT_PULLUP,   7) /* (C14) SPI1_CLK         => GPIO1_49 (UARTC.SLR)                 */
++			AM64X_IOPAD(0x0228, PIN_INPUT_PULLDOWN, 7) /* (B15) SPI1_D0          => GPIO1_50 (UARTC.SHUT_N)              */
++			AM64X_IOPAD(0x0270, PIN_INPUT_PULLUP,   7) /* (D18) ECAP0_IN_APWM_OUT=> GPIO1_68 (UARTD2.DCD)                */
++			AM64X_IOPAD(0x0274, PIN_INPUT_PULLUP,   7) /* (A19) EXT_REFCLK1      => GPIO1_69 (UARTD2.DSR)                */
++			AM64X_IOPAD(0x0268, PIN_OUTPUT_PULLUP,  7) /* (C18) I2C1_SCL         => GPIO1_66 (UARTD2.DTR)                */
++			AM64X_IOPAD(0x026C, PIN_INPUT_PULLUP,   7) /* (B19) I2C1_SDA         => GPIO1_67 (UARTD2.RI)                 */
++			AM64X_IOPAD(0x0284, PIN_INPUT_PULLDOWN, 7) /* (L21) MMC1_DAT1        => GPIO1_73 (DC_VALIDN)                 */
++			AM64X_IOPAD(0x0288, PIN_INPUT_PULLUP,   7) /* (K21) MMC1_DAT0        => GPIO1_74 (POE_VALIDN)                */
++			AM64X_IOPAD(0x0258, PIN_INPUT_PULLUP,   7) /* (C17) MCAN1_TX         => GPIO1_62 (UARTD0.DCD)                */
++			AM64X_IOPAD(0x025C, PIN_INPUT_PULLUP,   7) /* (D17) MCAN1_RX         => GPIO1_63 (UARTD0.DSR)                */
++			AM64X_IOPAD(0x0250, PIN_OUTPUT_PULLUP,  7) /* (A17) MCAN0_TX         => GPIO1_60 (UARTD0.DTR)                */
++			AM64X_IOPAD(0x0254, PIN_INPUT_PULLUP,   7) /* (B17) MCAN0_RX         => GPIO1_61 (UARTD0.RI)                 */
+ 		>;
+ 	};
+ 
+@@ -267,6 +259,19 @@
+ 		>;
+ 	};
+ 
++	/* PMIC_EXTINT# */
++	pinctrl_pmic_extint: main-system-extint-default-pins {
++		pinctrl-single,pins = <
++			AM62X_IOPAD(0x0278, PIN_INPUT, 0) /* (C19) EXTINTn */
++		>;
++	};
++
++	main_pcie0_pins_default: main-pcie0-pins-default {
++	    pinctrl-single,pins = <
++		AM64X_IOPAD(0x0248, PIN_INPUT_PULLUP, 3) /* (D16) UART1_CTSn.PCIE0_CLKREQn */
++	    >;
++	};
++
+ 	main_usb0_pins_default: main-usb0-pins-default {
+ 		pinctrl-single,pins = <
+ 			AM64X_IOPAD(0x02a8, PIN_OUTPUT, 0) /* (E19) USB0_DRVVBUS */
+@@ -297,18 +302,95 @@
+ 	pinctrl-0 = <&main_i2c0_pins_default>;
+ 	clock-frequency = <400000>;
+ 
++	eeprom@50 {
++		/* AT24CM01 */
++		compatible = "atmel,24c1024";
++		reg = <0x50>;
++	};
++
+ 	rtc0: rtc@52 {
+ 		compatible = "microcrystal,rv3028";
+ 		reg = <0x52>;
++		trickle-resistor-ohms = <3000>;
++		aux-voltage-chargeable = <1>;
++	};
+ 
+-		/*
+-		 * Optional recommended properties:
+-		 * - trickle-charge configuration
+-		 * - clock output enable
+-		 */
+-		backup-switchover-mode = "standard";
+-		trickle-resistor-ohms = <3000>;   /* 3kOhm typical */
+-		trickle-diode-disable;
++	tps65219: pmic@30 {
++		compatible = "ti,tps65219";
++		reg = <0x30>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pmic_extint>;
++		interrupt-parent = <&gic500>;
++		interrupts = <GIC_SPI 224 IRQ_TYPE_LEVEL_HIGH>;
++
++		buck1-supply = <&reg_vsodimm>;
++		buck2-supply = <&reg_vsodimm>;
++		buck3-supply = <&reg_vsodimm>;
++		ldo1-supply = <&reg_3v3>;
++		ldo2-supply = <&reg_1v8>;
++		ldo3-supply = <&reg_3v3>;
++		ldo4-supply = <&reg_3v3>;
++		system-power-controller;
++		ti,power-button;
++
++		regulators {
++			reg_vdd_core: buck1 {
++				regulator-name = "VDD_CORE";
++				regulator-min-microvolt = <750000>;
++				regulator-max-microvolt = <900000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			reg_1v8: buck2 {
++				regulator-name = "VCC1V8";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			reg_vdd_ddr: buck3 {
++				regulator-name = "VDD_LPDDR4";
++				regulator-min-microvolt = <1100000>;
++				regulator-max-microvolt = <1100000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			reg_sd_3v3_1v8: ldo1 {
++				regulator-name = "VDDSHV_SD_IO_PMIC";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-allow-bypass;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			reg_vddr_core: ldo2 {
++				regulator-name = "VDDAR_CORE";
++				regulator-min-microvolt = <850000>;
++				regulator-max-microvolt = <850000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			reg_1v8a: ldo3 {
++				regulator-name = "VDDA_1V8";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			reg_eth_2v5: ldo4 {
++				regulator-name = "VDD_PHY_2V5";
++				regulator-min-microvolt = <2500000>;
++				regulator-max-microvolt = <2500000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++		};
+ 	};
+ };
+ 
+@@ -325,6 +407,61 @@
+ 	status = "okay";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&main_gpio0_digital_pins>;
++
++	led_sys_red {
++		gpio-hog;
++		gpios = <62 GPIO_ACTIVE_HIGH>;
++		output-high;
++		line-name = "LED-SYS-RED";
++	};
++	led_sys_blue {
++		gpio-hog;
++		gpios = <46 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-SYS-BLUE";
++	};
++	led_sys_green {
++		gpio-hog;
++		gpios = <57 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-SYS-GREEN";
++	};
++	led_lte_red {
++		gpio-hog;
++		gpios = <63 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-LTE-RED";
++	};
++	led_lte_blue {
++		gpio-hog;
++		gpios = <48 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-LTE-BLUE";
++	};
++	led_lte_green {
++		gpio-hog;
++		gpios = <61 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-LTE-GREEN";
++	};
++	led_wifi_red {
++		gpio-hog;
++		gpios = <64 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-WIFI-RED";
++	};
++	led_wifi_blue {
++		gpio-hog;
++		gpios = <47 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-WIFI-BLUE";
++	};
++	led_wifi_green {
++		gpio-hog;
++		gpios = <58 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-WIFI-GREEN";
++	};
+ };
+ 
+ &main_gpio1 {
+@@ -393,11 +530,6 @@
+ 		ti,mbox-rx = <0 0 2>;
+ 		ti,mbox-tx = <1 0 2>;
+ 	};
+-
+-	mbox_main_r5fss0_core1: mbox-main-r5fss0-core1 {
+-		ti,mbox-rx = <2 0 2>;
+-		ti,mbox-tx = <3 0 2>;
+-	};
+ };
+ 
+ &mailbox0_cluster3 {
+@@ -424,15 +556,13 @@
+ };
+ 
+ &main_r5fss0_core0 {
+-	mboxes = <&mailbox0_cluster2 &mbox_main_r5fss0_core0>;
++	mboxes = <&mailbox0_cluster2>, <&mbox_main_r5fss0_core0>;
+ 	memory-region = <&main_r5fss0_core0_dma_memory_region>,
+ 			<&main_r5fss0_core0_memory_region>;
+ };
+ 
+ &main_r5fss0_core1 {
+-	mboxes = <&mailbox0_cluster2 &mbox_main_r5fss0_core1>;
+-	memory-region = <&main_r5fss0_core1_dma_memory_region>,
+-			<&main_r5fss0_core1_memory_region>;
++	status = "disabled";
+ };
+ 
+ &main_r5fss1 {
+diff --git a/arch/arm/dts/k3-am642-r5-iolan.dts b/arch/arm/dts/k3-am642-r5-iolan.dts
+old mode 100755
+new mode 100644
+index 0baeee14e17..1285200484d
+--- a/arch/arm/dts/k3-am642-r5-iolan.dts
++++ b/arch/arm/dts/k3-am642-r5-iolan.dts
+@@ -14,13 +14,13 @@
+ 
+ / {
+ 	chosen {
+-		stdout-path = "serial2:115200n8";
++		stdout-path = "serial0:115200n8";
+ 		tick-timer = &timer1;
+ 	};
+ 
+ 	aliases {
+-		serial2 = &main_uart3;
+-		serial5 = &main_uart0;
++		serial0 = &main_uart3;
++		serial1 = &main_uart0;
+ 
+ 		ethernet0 = &cpsw_port2;
+ 
+@@ -197,6 +197,13 @@
+ 			AM64X_IOPAD(0x0144, PIN_OUTPUT, 4) /* (Y11) PRG1_PRU1_GPO15.RGMII2_TX_CTL */
+ 		>;
+ 	};
++
++	main_i2c0_pins_default: main-i2c0-pins-default {
++		pinctrl-single,pins = <
++			AM64X_IOPAD(0x0260, PIN_INPUT_PULLUP, 0)    /* (A18) I2C0_SCL */
++			AM64X_IOPAD(0x0264, PIN_INPUT_PULLUP, 0)    /* (B18) I2C0_SDA */
++		>;
++	};
+ };
+ 
+ &dmsc {
+@@ -214,7 +221,7 @@
+ 	/delete-property/ clock-names;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&main_uart0_pins_default>;
+-	status = "disabled";
++	status = "okay";
+ };
+ 
+ &main_uart1 {
+@@ -253,6 +260,13 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&main_i2c0_pins_default>;
+ 	clock-frequency = <400000>;
++
++	tps65219: pmic@30 {
++		compatible = "ti,tps65219";
++		reg = <0x30>;
++		system-power-controller;
++		ti,power-button;
++	};
+ };
+ 
+ &main_i2c1 {
+diff --git a/configs/am64x_iolan_a53_defconfig b/configs/am64x_iolan_a53_defconfig
+old mode 100755
+new mode 100644
+index cc80e4bef53..15a865bef47
+--- a/configs/am64x_iolan_a53_defconfig
++++ b/configs/am64x_iolan_a53_defconfig
+@@ -1242,7 +1242,7 @@ CONFIG_TI_SCI_PROTOCOL=y
+ # CONFIG_FWU_MDATA is not set
+ CONFIG_GPIO=y
+ CONFIG_SPL_DM_GPIO=y
+-# CONFIG_GPIO_HOG is not set
++CONFIG_GPIO_HOG=y
+ # CONFIG_SPL_GPIO_HOG is not set
+ # CONFIG_DM_GPIO_LOOKUP_LABEL is not set
+ # CONFIG_SPL_DM_GPIO_LOOKUP_LABEL is not set
+diff --git a/configs/am64x_iolan_r5_defconfig b/configs/am64x_iolan_r5_defconfig
+old mode 100755
+new mode 100644
+index e35bd320fdf..c2da37685ec
+--- a/configs/am64x_iolan_r5_defconfig
++++ b/configs/am64x_iolan_r5_defconfig
+@@ -1188,8 +1188,8 @@ CONFIG_TI_SCI_PROTOCOL=y
+ # CONFIG_FWU_MDATA is not set
+ CONFIG_GPIO=y
+ CONFIG_SPL_DM_GPIO=y
+-# CONFIG_GPIO_HOG is not set
+-# CONFIG_SPL_GPIO_HOG is not set
++CONFIG_GPIO_HOG=y
++CONFIG_SPL_GPIO_HOG=y
+ # CONFIG_DM_GPIO_LOOKUP_LABEL is not set
+ # CONFIG_SPL_DM_GPIO_LOOKUP_LABEL is not set
+ # CONFIG_ALTERA_PIO is not set

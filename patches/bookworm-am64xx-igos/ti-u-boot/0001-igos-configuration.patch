@@ -1,5 +1,5 @@
 diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
-index 4beef8cdb33..15cb9339c0c 100644
+index 4beef8cdb33..05c49f92700 100644
 --- a/arch/arm/dts/Makefile
 +++ b/arch/arm/dts/Makefile
 @@ -1287,7 +1287,9 @@ dtb-$(CONFIG_SOC_K3_AM642) += k3-am642-evm.dtb \
@@ -8,27 +8,27 @@ index 4beef8cdb33..15cb9339c0c 100644
  			      k3-am642-r5-sk.dtb \
 -			      k3-am642-evm-nand.dtbo
 +			      k3-am642-evm-nand.dtbo \
-+			      k3-am642-iolan.dtb \
-+			      k3-am642-r5-iolan.dtb
++			      k3-am642-igos.dtb \
++			      k3-am642-r5-igos.dtb
  
  dtb-$(CONFIG_SOC_K3_AM625) += k3-am625-sk.dtb \
  			      k3-am625-r5-sk.dtb \
-diff --git a/arch/arm/dts/k3-am642-iolan-u-boot.dtsi b/arch/arm/dts/k3-am642-iolan-u-boot.dtsi
-new file mode 100755
-index 00000000000..95fb5b7dc6d
+diff --git a/arch/arm/dts/k3-am642-igos-u-boot.dtsi b/arch/arm/dts/k3-am642-igos-u-boot.dtsi
+new file mode 100644
+index 00000000000..c79ab061814
 --- /dev/null
-+++ b/arch/arm/dts/k3-am642-iolan-u-boot.dtsi
-@@ -0,0 +1,297 @@
++++ b/arch/arm/dts/k3-am642-igos-u-boot.dtsi
+@@ -0,0 +1,255 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Copyright (C) 2020-2021 Texas Instruments Incorporated - https://www.ti.com/
 + */
 +
-+#include "k3-am64x-iolan-binman.dtsi"
++#include "k3-am64x-igos-binman.dtsi"
 +
 +/ {
 +	chosen {
-+		stdout-path = "serial2:115200n8";
++		stdout-path = "serial0:115200n8";
 +		tick-timer = &timer1;
 +	};
 +
@@ -101,82 +101,11 @@ index 00000000000..95fb5b7dc6d
 +
 +&main_pmx0 {
 +	bootph-pre-ram;
-+	main_i2c0_pins_default: main-i2c0-pins-default {
-+		bootph-pre-ram;
-+		pinctrl-single,pins = <
-+			AM64X_IOPAD(0x0260, PIN_INPUT_PULLUP, 0) /* (A18) I2C0_SCL */
-+			AM64X_IOPAD(0x0264, PIN_INPUT_PULLUP, 0) /* (B18) I2C0_SDA */
-+		>;
-+	};
++	bootph-initial-initialized;
 +};
 +
 +&main_i2c0 {
-+	status = "okay";
 +	bootph-pre-ram;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&main_i2c0_pins_default>;
-+	clock-frequency = <400000>;
-+
-+	tps65219: pmic@30 {
-+		compatible = "ti,tps65219";
-+		reg = <0x30>;
-+
-+		regulators {
-+			buck1_reg: buck1 {
-+				regulator-name = "VDD_CORE";
-+				regulator-min-microvolt = <750000>;
-+				regulator-max-microvolt = <750000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			buck2_reg: buck2 {
-+				regulator-name = "VCC1V8";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			buck3_reg: buck3 {
-+				regulator-name = "VDD_LPDDR4";
-+				regulator-min-microvolt = <1100000>;
-+				regulator-max-microvolt = <1100000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			ldo1_reg: ldo1 {
-+				regulator-name = "VDDSHV_SD_IO_PMIC";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo2_reg: ldo2 {
-+				regulator-name = "VDDAR_CORE";
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <850000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			ldo3_reg: ldo3 {
-+				regulator-name = "VDDA_1V8";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			ldo4_reg: ldo4 {
-+				regulator-name = "VDD_PHY_2V5";
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <2500000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+		};
-+	};
 +};
 +
 +&main_uart0 {
@@ -311,17 +240,46 @@ index 00000000000..95fb5b7dc6d
 +
 +&main_gpio0 {
 +	bootph-pre-ram;
++	bootph-initial-initialized;
++	led_sys_red {
++		bootph-initial-initialized;
++	};
++	led_sys_blue {
++		bootph-initial-initialized;
++	};
++	led_sys_green {
++		bootph-initial-initialized;
++	};
++	led_lte_red {
++		bootph-initial-initialized;
++	};
++	led_lte_blue {
++		bootph-initial-initialized;
++	};
++	led_lte_green {
++		bootph-initial-initialized;
++	};
++	led_wifi_red {
++		bootph-initial-initialized;
++	};
++	led_wifi_blue {
++		bootph-initial-initialized;
++	};
++	led_wifi_green {
++		bootph-initial-initialized;
++	};
 +};
 +
 +&main_gpio1 {
 +	bootph-pre-ram;
++	bootph-initial-initialized;
 +};
-diff --git a/arch/arm/dts/k3-am642-iolan.dts b/arch/arm/dts/k3-am642-iolan.dts
-new file mode 100755
-index 00000000000..d0597edbc80
+diff --git a/arch/arm/dts/k3-am642-igos.dts b/arch/arm/dts/k3-am642-igos.dts
+new file mode 100644
+index 00000000000..3a9ba880b78
 --- /dev/null
-+++ b/arch/arm/dts/k3-am642-iolan.dts
-@@ -0,0 +1,476 @@
++++ b/arch/arm/dts/k3-am642-igos.dts
+@@ -0,0 +1,611 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Copyright (C) 2020-2021 Texas Instruments Incorporated - https://www.ti.com/
@@ -337,17 +295,17 @@ index 00000000000..d0597edbc80
 +#include "k3-am642.dtsi"
 +
 +/ {
-+	compatible = "ti,am642-iolan", "ti,am642";
-+	model = "Perle AM6412 IOLAN";
++	compatible = "ti,am642-igos", "ti,am642";
++	model = "Perle AM6412 IGOS";
 +
 +	chosen {
-+		stdout-path = "serial2:115200n8";
-+		bootargs = "console=ttyS2,115200n8 earlycon=ns16550a,mmio32,0x02830000";
++		stdout-path = "serial0:115200n8";
++		bootargs = "console=ttyS0,115200n8 earlycon=ns16550a,mmio32,0x02830000";
 +	};
 +
 +    aliases {
-+        serial2   = &main_uart3;
-+        serial5   = &main_uart0;
++        serial0   = &main_uart3;
++        serial1   = &main_uart0;
 +
 +        ethernet0 = &cpsw_port2;
 +
@@ -360,7 +318,6 @@ index 00000000000..d0597edbc80
 +		device_type = "memory";
 +		/* 2G RAM */
 +		reg = <0x00000000 0x80000000 0x00000000 0x80000000>;
-+
 +	};
 +
 +	reserved-memory {
@@ -386,18 +343,6 @@ index 00000000000..d0597edbc80
 +			no-map;
 +		};
 +
-+		main_r5fss0_core1_dma_memory_region: r5f-dma-memory@a1000000 {
-+			compatible = "shared-dma-pool";
-+			reg = <0x00 0xa1000000 0x00 0x100000>;
-+			no-map;
-+		};
-+
-+		main_r5fss0_core1_memory_region: r5f-memory@a1100000 {
-+			compatible = "shared-dma-pool";
-+			reg = <0x00 0xa1100000 0x00 0xf00000>;
-+			no-map;
-+		};
-+
 +		rtos_ipc_memory_region: ipc-memories@a5000000 {
 +			reg = <0x00 0xa5000000 0x00 0x00800000>;
 +			alignment = <0x1000>;
@@ -405,100 +350,40 @@ index 00000000000..d0597edbc80
 +		};
 +	};
 +
-+	vusb_main: fixed-regulator-vusb-main5v0 {
-+		/* USB MAIN INPUT 5V DC */
++	/* Module Power Supply */
++	reg_vsodimm: regulator-vsodimm {
 +		compatible = "regulator-fixed";
-+		regulator-name = "vusb_main5v0";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		regulator-boot-on;
++		regulator-name = "+V_SODIMM";
 +	};
 +
-+	vcc_3v3_sys: fixedregulator-vcc-3v3-sys {
-+		/* output of LP8733xx */
++	/* Non PMIC On-module Supplies */
++	reg_3v3: regulator-3v3 {
 +		compatible = "regulator-fixed";
-+		regulator-name = "vcc_3v3_sys";
-+		regulator-min-microvolt = <3300000>;
 +		regulator-max-microvolt = <3300000>;
-+		vin-supply = <&vusb_main>;
-+		regulator-always-on;
-+		regulator-boot-on;
++		regulator-min-microvolt = <3300000>;
++		regulator-name = "On-module +V3.3";
++		vin-supply = <&reg_vsodimm>;
 +	};
 +
 +	leds {
 +		compatible = "gpio-leds";
-+
-+		led-0 {
-+			color = <LED_COLOR_ID_GREEN>;
-+			function = LED_FUNCTION_INDICATOR;
-+			function-enumerator = <1>;
-+			gpios = <&main_gpio0 46 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO1 (U8) */
++		led-uart0-tx {
++			label = "uart0:tx";
++			color = <LED_COLOR_ID_YELLOW>;
++			function = LED_FUNCTION_TX;
++			gpios = <&main_gpio0 4 GPIO_ACTIVE_HIGH>;	/* OSPI0_D1 (M18) */
 +			default-state = "off";
++			linux,default-trigger = "tty";
++			trigger-sources = <&main_uart0>;
 +		};
-+
-+		led-1 {
-+			color = <LED_COLOR_ID_BLUE>;
-+			function = LED_FUNCTION_INDICATOR;
-+			function-enumerator = <2>;
-+			gpios = <&main_gpio0 57 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO12 (U9) */
++		led-uart0-rx {
++			label = "uart0:rx";
++			color = <LED_COLOR_ID_YELLOW>;
++			function = LED_FUNCTION_RX;
++			gpios = <&main_gpio0 5 GPIO_ACTIVE_HIGH>;	/* OSPI0_D2 (M20) */
 +			default-state = "off";
-+		};
-+
-+		led-2 {
-+			color = <LED_COLOR_ID_RED>;
-+			function = LED_FUNCTION_INDICATOR;
-+			function-enumerator = <3>;
-+			gpios = <&main_gpio0 62 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO17 (U7) */
-+			default-state = "off";
-+		};
-+
-+		led-3 {
-+			color = <LED_COLOR_ID_GREEN>;
-+			function = LED_FUNCTION_INDICATOR;
-+			function-enumerator = <4>;
-+			gpios = <&main_gpio0 47 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO2 (W8) */
-+			default-state = "off";
-+		};
-+
-+		led-4 {
-+			color = <LED_COLOR_ID_BLUE>;
-+			function = LED_FUNCTION_INDICATOR;
-+			function-enumerator = <5>;
-+			gpios = <&main_gpio0 58 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO13 (W9) */
-+			default-state = "off";
-+		};
-+
-+		led-5 {
-+			color = <LED_COLOR_ID_RED>;
-+			function = LED_FUNCTION_INDICATOR;
-+			function-enumerator = <6>;
-+			gpios = <&main_gpio0 64 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO19 (W7) */
-+			default-state = "off";
-+		};
-+
-+		led-6 {
-+			color = <LED_COLOR_ID_GREEN>;
-+			function = LED_FUNCTION_INDICATOR;
-+			function-enumerator = <7>;
-+			gpios = <&main_gpio0 48 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO3 (V8) */
-+			default-state = "off";
-+		};
-+
-+		led-7 {
-+			color = <LED_COLOR_ID_BLUE>;
-+			function = LED_FUNCTION_INDICATOR;
-+			function-enumerator = <8>;
-+			gpios = <&main_gpio0 61 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO16 (V9) */
-+			default-state = "off";
-+		};
-+
-+		led-8 {
-+			color = <LED_COLOR_ID_RED>;
-+			function = LED_FUNCTION_INDICATOR;
-+			function-enumerator = <9>;
-+			gpios = <&main_gpio0 63 GPIO_ACTIVE_HIGH>;	/* PRG1_PRU0_GPO16 (V7) */
-+			default-state = "off";
++			linux,default-trigger = "tty";
++			trigger-sources = <&main_uart0>;
 +		};
 +	};
 +};
@@ -506,47 +391,112 @@ index 00000000000..d0597edbc80
 +&main_pmx0 {
 +	main_uart0_pins_default: main-uart0-pins-default {
 +		pinctrl-single,pins = <
-+			AM64X_IOPAD(0x0238, PIN_INPUT, 0) /* (B16) UART0_CTSn */
-+			AM64X_IOPAD(0x023c, PIN_OUTPUT, 0) /* (A16) UART0_RTSn */
-+			AM64X_IOPAD(0x0230, PIN_INPUT, 0) /* (D15) UART0_RXD */
-+			AM64X_IOPAD(0x0234, PIN_OUTPUT, 0) /* (C16) UART0_TXD */
++			AM64X_IOPAD(0x0230, PIN_INPUT_PULLUP, 0)    /* (D15) UART0_RXD */
++			AM64X_IOPAD(0x0234, PIN_OUTPUT, 0)          /* (C16) UART0_TXD */
++			AM64X_IOPAD(0x0238, PIN_INPUT_PULLUP, 0)    /* (B16) UART0_CTSn */
++			AM64X_IOPAD(0x023c, PIN_OUTPUT, 0)          /* (A16) UART0_RTSn */
 +		>;
 +	};
 +
 +	main_uart3_pins_default: main-uart3-pins-default {
 +		pinctrl-single,pins = <
-+ 			AM64X_IOPAD(0x0188, PIN_INPUT_PULLUP, 10) /* (AA5) UART3_RXD */
-+ 			AM64X_IOPAD(0x0170, PIN_OUTPUT, 10)       /* (AA2) UART3_TXD */
++ 			AM64X_IOPAD(0x0188, PIN_INPUT_PULLUP, 10)   /* (AA5) UART3_RXD */
++ 			AM64X_IOPAD(0x0170, PIN_OUTPUT, 10)         /* (AA2) UART3_TXD */
++		>;
++	};
++
++	main_i2c0_pins_default: main-i2c0-pins-default {
++		pinctrl-single,pins = <
++			AM64X_IOPAD(0x0260, PIN_INPUT_PULLUP, 0)    /* (A18) I2C0_SCL */
++			AM64X_IOPAD(0x0264, PIN_INPUT_PULLUP, 0)    /* (B18) I2C0_SDA */
 +		>;
 +	};
 +
 +	/* Digital IOs */
 +	main_gpio0_digital_pins: main-gpio0-digital-pins {
 +		pinctrl-single,pins = <
-+			AM64X_IOPAD(0x0030, PIN_OUTPUT, 7) /* (L18) GPIO0_12 - OSPI0_CSN1 => UARTLED5.TX */
-+			AM64X_IOPAD(0x0034, PIN_INPUT, 7)  /* (K17) GPIO0_13 - OSPI0_CSN2 => UARTLED5.RX */
-+			AM64X_IOPAD(0x0088, PIN_OUTPUT, 7) /* (R18) GPIO0_33 - VPP_LDO_EN => GPMC0_OEN_REN */
++			AM64X_IOPAD(0x0010, PIN_OUTPUT_PULLDOWN,7) /* (M18) OSPI0_D1         => GPIO0_4  (UARTLED0.TX)               */
++			AM64X_IOPAD(0x0014, PIN_OUTPUT_PULLDOWN,7) /* (M20) OSPI0_D2         => GPIO0_5  (UARTLED0.RX)               */
++			AM64X_IOPAD(0x0018, PIN_OUTPUT_PULLDOWN,7) /* (M21) OSPI0_D3         => GPIO0_6  (UARTLED2.TX)               */
++			AM64X_IOPAD(0x001C, PIN_OUTPUT_PULLDOWN,7) /* (P21) OSPI0_D4         => GPIO0_7  (UARTLED2.RX)               */
++			AM64X_IOPAD(0x0020, PIN_OUTPUT_PULLDOWN,7) /* (P20) OSPI0_D5         => GPIO0_8  (UARTLED4.TX)               */
++			AM64X_IOPAD(0x0024, PIN_OUTPUT_PULLDOWN,7) /* (N18) OSPI0_D6         => GPIO0_9  (UARTLED4.RX)               */
++			AM64X_IOPAD(0x0030, PIN_OUTPUT_PULLDOWN,7) /* (L18) OSIP0_CSn1       => GPIO0_12 (UARTLED5.TX)               */
++			AM64X_IOPAD(0x0034, PIN_OUTPUT_PULLDOWN,7) /* (K17) OSPI0_CSn2       => GPIO0_13 (UARTLED5.RX)               */
++			AM64X_IOPAD(0x00A4, PIN_INPUT_PULLUP,   7) /* (N17) GPMC0_DIR        => GPIO0_40 (UARTC2.MODE0)              */
++			AM64X_IOPAD(0x00B4, PIN_INPUT_PULLUP,   7) /* (R21) GPMC0_CSn3       => GPIO0_44 (UARTC2.MODE1)              */
++			AM64X_IOPAD(0x0084, PIN_INPUT_PULLUP,   7) /* (P16) GPMC0_ADVn_ALE   => GPIO0_32 (UARTC2.MODE2)              */
++			AM64X_IOPAD(0x00A8, PIN_INPUT_PULLDOWN, 7) /* (R19) GPMC0_CSn0       => GPIO0_41 (UARTC2.TERM_TX)            */
++			AM64X_IOPAD(0x00AC, PIN_INPUT_PULLDOWN, 7) /* (R20) GPMC0_CSn1       => GPIO0_42 (UARTC2.TERM_RX)            */
++			AM64X_IOPAD(0x0090, PIN_INPUT_PULLUP,   7) /* (P17) GPMC0_BE0n_CLE   => GPIO0_35 (UARTC2.SLR)                */
++			AM64X_IOPAD(0x0094, PIN_INPUT_PULLDOWN, 7) /* (T19) GPMC0_BE1n       => GPIO0_36 (UARTC2.SHUT_N)             */
++			AM64X_IOPAD(0x00FC, PIN_INPUT_PULLUP,   7) /* (U7)  PRG1_PRU0_GPO17  => GPIO0_62 (STAT_SYS.RED)              */
++			AM64X_IOPAD(0x00BC, PIN_INPUT_PULLDOWN, 7) /* (U8)  PRG1_PRU0_GPO1   => GPIO0_46 (STAT_SYS.BLUE)             */
++			AM64X_IOPAD(0x00E8, PIN_INPUT_PULLDOWN, 7) /* (U9)  PRG1_PRU0_GPO12  => GPIO0_57 (STAT_SYS.GREEN)            */
++			AM64X_IOPAD(0x0100, PIN_INPUT_PULLUP,   7) /* (V7)  PRG1_PRU0_GPO18  => GPIO0_63 (STAT_LTE.RED)              */
++			AM64X_IOPAD(0x00C4, PIN_INPUT_PULLDOWN, 7) /* (V8)  PRG1_PRU0_GPO3   => GPIO0_48 (STAT_LTE.BLUE)             */
++			AM64X_IOPAD(0x00F8, PIN_INPUT_PULLDOWN, 7) /* (V9)  PRG1_PRU0_GPO16  => GPIO0_61 (STAT_LTE.GREEN)            */
++			AM64X_IOPAD(0x0104, PIN_INPUT_PULLUP,   7) /* (W7)  PRG1_PRU0_GPO19  => GPIO0_64 (STAT_WIFI.RED)             */
++			AM64X_IOPAD(0x00C0, PIN_INPUT_PULLDOWN, 7) /* (W8)  PRG1_PRU0_GPO2   => GPIO0_47 (STAT_WIFI.BLUE)            */
++			AM64X_IOPAD(0x00EC, PIN_INPUT_PULLDOWN, 7) /* (W9)  PRG1_PRU0_GPO13  => GPIO0_58 (STAT_WIFI.GREEN)           */
++			AM64X_IOPAD(0x0038, PIN_INPUT_PULLUP,   7) /* (L17) OSPI0_CSn3       => GPIO0_14 (WIFI_PDN_GPIO)             */
++			AM64X_IOPAD(0x0088, PIN_INPUT_PULLDOWN, 7) /* (R18) GPMC0_OEn_REn    => GPIO0_33 (VPP_LDO_EN)                */
++			AM64X_IOPAD(0x0098, PIN_INPUT_PULLDOWN, 7) /* (W19) GPMC0_WAIT0      => GPIO0_37 (PATH_THROUGH_SEL)          */
++			AM64X_IOPAD(0x00B8, PIN_INPUT_PULLUP,   7) /* (Y7)  PRG1_PRU0_GPO0   => GPIO0_45 (VSEL_SD_SWITCH)            */
++			AM64X_IOPAD(0x00D4, PIN_INPUT_PULLUP,   7) /* (U13) PRG1_PRU0_GPO7   => GPIO0_52 (SIM1_DETECT)               */
++			AM64X_IOPAD(0x00C8, PIN_INPUT_PULLUP,   7) /* (Y8)  PRG1_PRU0_GPO4   => GPIO0_49 (SIM2_DETECT)               */
++			AM64X_IOPAD(0x00F4, PIN_INPUT_PULLDOWN, 7) /* (Y9)  PRG1_PRU0_GPO15  => GPIO0_60 (SIM_SELECT1N_2)            */
++			AM64X_IOPAD(0x00D0, PIN_INPUT_PULLUP,   7) /* (AA7) PRG1_PRU0_GPO6   => GPIO0_51 (PMIC_STBY)                 */
++			AM64X_IOPAD(0x00E4, PIN_INPUT_PULLUP,   7) /* (AA8) PRG1_PRU0_GPO11  => GPIO0_56 (CELL_SHUTDOWN_N)           */
++			AM64X_IOPAD(0x00F0, PIN_INPUT_PULLDOWN, 7) /* (AA9) PRG1_PRU0_GPO14  => GPIO0_59 (CELL_UNCONDITIONAL_RESET)  */
++			AM64X_IOPAD(0x0158, PIN_INPUT_PULLDOWN, 7) /* (AA6) PRG1_MDIO0_MDIO  => GPIO0_85 (CELL_FLIGHT_MODE)          */
++			AM64X_IOPAD(0x015C, PIN_INPUT_PULLDOWN, 7) /* (Y6)  PRG1_MDIO0_MDC   => GPIO0_86 (CELL_GNSS_DISABLE)         */
 +		>;
 +	};
 +
 +	/* Digital IOs */
 +	main_gpio1_digital_pins: main-gpio1-digital-pins {
 +		pinctrl-single,pins = <
-+			AM64X_IOPAD(0x01F0, PIN_INPUT_PULLUP,   7) /* (AA4) PRG0_PRU1_GPO16 => GPIO1_36/pin 123 (PUSH_KEY) */
-+			AM64X_IOPAD(0x0208, PIN_OUTPUT, 7) /* (D12) GPIO1_42 => SPI0_CS0 */
-+			AM64X_IOPAD(0x020C, PIN_OUTPUT, 7) /* (C13) GPIO1_43 => SPI0_CS1 */
-+			AM64X_IOPAD(0x0210, PIN_OUTPUT, 7) /* (D13) GPIO1_44 => SPI0_CLK */
-+			AM64X_IOPAD(0x0214, PIN_OUTPUT, 7) /* (A13) GPIO1_45 => SPI0_D0 */
-+			AM64X_IOPAD(0x0218, PIN_OUTPUT, 7) /* (A14) GPIO1_46 => SPI0_D1 */
-+			AM64X_IOPAD(0x0224, PIN_OUTPUT, 7) /* (C14) GPIO1_49 => SPI1_CLK */
-+			AM64X_IOPAD(0x0228, PIN_OUTPUT, 7) /* (B15) GPIO1_50 => SPI1_D0 */
-+		>;
-+	};
-+
-+	main_i2c0_pins_default: main-i2c0-pins-default {
-+		pinctrl-single,pins = <
-+			AM64X_IOPAD(0x0260, PIN_INPUT_PULLUP, 0) /* (A18) I2C0_SCL */
-+			AM64X_IOPAD(0x0264, PIN_INPUT_PULLUP, 0) /* (B18) I2C0_SDA */
++			AM64X_IOPAD(0x0160, PIN_INPUT_PULLUP,   7) /* (Y1)  PRG0_PRU0_GPO0   => GPIO1_0  (UARTD5.DCD)                */
++			AM64X_IOPAD(0x016C, PIN_INPUT_PULLUP,   7) /* (V2)  PRG0_PRU0_GPO3   => GPIO1_3  (UARTD5.DSR)                */
++			AM64X_IOPAD(0x01A8, PIN_OUTPUT_PULLUP,  7) /* (V1)  PRG0_PRU0_GPO18  => GPIO1_18 (UARTD5.DTR)                */
++			AM64X_IOPAD(0x01AC, PIN_INPUT_PULLUP,   7) /* (W1)  PRG0_PRU0_GPO19  => GPIO1_19 (UARTD5.RI)                 */
++			AM64X_IOPAD(0x0174, PIN_INPUT_PULLUP,   7) /* (R3)  PRG0_PRU0_GPO5   => GPIO1_5  (UARTC4.MODE0)              */
++			AM64X_IOPAD(0x0164, PIN_INPUT_PULLUP,   7) /* (R4)  PRG0_PRU0_GPO1   => GPIO1_1  (UARTC4.MODE1)              */
++			AM64X_IOPAD(0x01C8, PIN_INPUT_PULLUP,   7) /* (R5)  PRG0_PRU1_GPO6   => GPIO1_26 (UARTC4.MODE2)              */
++			AM64X_IOPAD(0x0204, PIN_INPUT_PULLDOWN, 7) /* (P3)  PRG0_MDIO0_MDC   => GPIO1_41 (UARTC4.TERM_TX)            */
++			AM64X_IOPAD(0x0200, PIN_INPUT_PULLDOWN, 7) /* (P2)  PRG0_MDIO0_MDIO  => GPIO1_40 (UARTC4.TERM_RX)            */
++			AM64X_IOPAD(0x0194, PIN_INPUT_PULLUP,   7) /* (R6)  PRG0_PRU0_GPO13  => GPIO1_13 (UARTC4.SLR)                */
++			AM64X_IOPAD(0x01E4, PIN_INPUT_PULLDOWN, 7) /* (T6)  PRG0_PRU1_GPO13  => GPIO1_33 (UARTC4.SHUT_N)             */
++			AM64X_IOPAD(0x0168, PIN_INPUT_PULLUP,   7) /* (U2)  PRG0_PRU0_GPO2   => GPIO1_2  (UARTD4.DCD)                */
++			AM64X_IOPAD(0x017C, PIN_INPUT_PULLUP,   7) /* (T1)  PRG0_PRU0_GPO7   => GPIO1_7  (UARTD4.DSR)                */
++			AM64X_IOPAD(0x01A4, PIN_OUTPUT_PULLUP,  7) /* (U1)  PRG0_PRU0_GPO17  => GPIO1_17 (UARTD4.DTR)                */
++			AM64X_IOPAD(0x01D0, PIN_INPUT_PULLUP,   7) /* (R1)  PRG0_PRU1_GPO8   => GPIO1_28 (UARTD4.RI)                 */
++			AM64X_IOPAD(0x019C, PIN_INPUT_PULLUP,   7) /* (T5)  PRG0_PRU0_GPO15  => GPIO1_15 (UARTC5.MODE0)              */
++			AM64X_IOPAD(0x01EC, PIN_INPUT_PULLUP,   7) /* (U5)  PRG0_PRU1_GPO15  => GPIO1_35 (UARTC5.MODE1)              */
++			AM64X_IOPAD(0x01F4, PIN_INPUT_PULLUP,   7) /* (V5)  PRG0_PRU1_GPO17  => GPIO1_37 (UARTC5.MODE2)              */
++			AM64X_IOPAD(0x0198, PIN_INPUT_PULLDOWN, 7) /* (V4)  PRG0_PRU0_GPO14  => GPIO1_14 (UARTC5.TERM_TX)            */
++			AM64X_IOPAD(0x01A0, PIN_INPUT_PULLDOWN, 7) /* (U4)  PRG0_PRU0_GPO16  => GPIO1_16 (UARTC5.TERM_RX)            */
++			AM64X_IOPAD(0x01D8, PIN_INPUT_PULLUP,   7) /* (V6)  PRG0_PRU1_GPO10  => GPIO1_30 (UARTC5.SLR)                */
++			AM64X_IOPAD(0x0184, PIN_INPUT_PULLDOWN, 7) /* (W6)  PRG0_PRU0_GPO9   => GPIO1_9  (UARTC5.SHUT_N)             */
++			AM64X_IOPAD(0x01F0, PIN_INPUT_PULLUP,   7) /* (AA4) PRG0_PRU1_GPO16  => GPIO1_36 (PUSH_KEY)                  */
++			AM64X_IOPAD(0x0218, PIN_INPUT_PULLUP,   7) /* (A14) SPI0_D1          => GPIO1_46 (UARTC.MODE0)               */
++			AM64X_IOPAD(0x0208, PIN_INPUT_PULLUP,   7) /* (D12) SPI0_CS0         => GPIO1_42 (UARTC.MODE1)               */
++			AM64X_IOPAD(0x020C, PIN_INPUT_PULLUP,   7) /* (C13) SPI0_CS1         => GPIO1_43 (UARTC.MODE2)               */
++			AM64X_IOPAD(0x0210, PIN_INPUT_PULLDOWN, 7) /* (D13) SPI0_CLK         => GPIO1_44 (UARTC.TERM_TX)             */
++			AM64X_IOPAD(0x0214, PIN_INPUT_PULLDOWN, 7) /* (A13) SPI0_D0          => GPIO1_45 (UARTC.TERM_RX)             */
++			AM64X_IOPAD(0x0224, PIN_INPUT_PULLUP,   7) /* (C14) SPI1_CLK         => GPIO1_49 (UARTC.SLR)                 */
++			AM64X_IOPAD(0x0228, PIN_INPUT_PULLDOWN, 7) /* (B15) SPI1_D0          => GPIO1_50 (UARTC.SHUT_N)              */
++			AM64X_IOPAD(0x0270, PIN_INPUT_PULLUP,   7) /* (D18) ECAP0_IN_APWM_OUT=> GPIO1_68 (UARTD2.DCD)                */
++			AM64X_IOPAD(0x0274, PIN_INPUT_PULLUP,   7) /* (A19) EXT_REFCLK1      => GPIO1_69 (UARTD2.DSR)                */
++			AM64X_IOPAD(0x0268, PIN_OUTPUT_PULLUP,  7) /* (C18) I2C1_SCL         => GPIO1_66 (UARTD2.DTR)                */
++			AM64X_IOPAD(0x026C, PIN_INPUT_PULLUP,   7) /* (B19) I2C1_SDA         => GPIO1_67 (UARTD2.RI)                 */
++			AM64X_IOPAD(0x0284, PIN_INPUT_PULLDOWN, 7) /* (L21) MMC1_DAT1        => GPIO1_73 (DC_VALIDN)                 */
++			AM64X_IOPAD(0x0288, PIN_INPUT_PULLUP,   7) /* (K21) MMC1_DAT0        => GPIO1_74 (POE_VALIDN)                */
++			AM64X_IOPAD(0x0258, PIN_INPUT_PULLUP,   7) /* (C17) MCAN1_TX         => GPIO1_62 (UARTD0.DCD)                */
++			AM64X_IOPAD(0x025C, PIN_INPUT_PULLUP,   7) /* (D17) MCAN1_RX         => GPIO1_63 (UARTD0.DSR)                */
++			AM64X_IOPAD(0x0250, PIN_OUTPUT_PULLUP,  7) /* (A17) MCAN0_TX         => GPIO1_60 (UARTD0.DTR)                */
++			AM64X_IOPAD(0x0254, PIN_INPUT_PULLUP,   7) /* (B17) MCAN0_RX         => GPIO1_61 (UARTD0.RI)                 */
 +		>;
 +	};
 +
@@ -591,6 +541,19 @@ index 00000000000..d0597edbc80
 +		>;
 +	};
 +
++	/* PMIC_EXTINT# */
++	pinctrl_pmic_extint: main-system-extint-default-pins {
++		pinctrl-single,pins = <
++			AM64X_IOPAD(0x0278, PIN_INPUT, 7) /* (C19) EXTINTn, GPIO1_70 */
++		>;
++	};
++
++	main_pcie0_pins_default: main-pcie0-pins-default {
++	    pinctrl-single,pins = <
++		AM64X_IOPAD(0x0248, PIN_INPUT_PULLUP, 3) /* (D16) UART1_CTSn.PCIE0_CLKREQn */
++	    >;
++	};
++
 +	main_usb0_pins_default: main-usb0-pins-default {
 +		pinctrl-single,pins = <
 +			AM64X_IOPAD(0x02a8, PIN_OUTPUT, 0) /* (E19) USB0_DRVVBUS */
@@ -621,18 +584,98 @@ index 00000000000..d0597edbc80
 +	pinctrl-0 = <&main_i2c0_pins_default>;
 +	clock-frequency = <400000>;
 +
++	eeprom@50 {
++		/* AT24CM01 */
++		compatible = "atmel,24c1024";
++		reg = <0x50>;
++		vcc-supply = <&reg_3v3>;
++	};
++
 +	rtc0: rtc@52 {
 +		compatible = "microcrystal,rv3028";
 +		reg = <0x52>;
++		trickle-resistor-ohms = <3000>;
++		aux-voltage-chargeable = <1>;
++	};
 +
-+		/*
-+		 * Optional recommended properties:
-+		 * - trickle-charge configuration
-+		 * - clock output enable
-+		 */
-+		backup-switchover-mode = "standard";
-+		trickle-resistor-ohms = <3000>;   /* 3kOhm typical */
-+		trickle-diode-disable;
++	tps65219: pmic@30 {
++		compatible = "ti,tps65219";
++		reg = <0x30>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pmic_extint>;
++		/* interrupt-parent = <&main_gpio1>; */
++		/* interrupts = <70 IRQ_TYPE_EDGE_FALLING>; */
++		interrupt-parent = <&gic500>;
++		interrupts = <GIC_SPI 224 IRQ_TYPE_EDGE_FALLING>;
++
++		buck1-supply = <&reg_vsodimm>;
++		buck2-supply = <&reg_vsodimm>;
++		buck3-supply = <&reg_vsodimm>;
++		ldo1-supply = <&reg_3v3>;
++		ldo2-supply = <&reg_vsodimm>;
++		ldo3-supply = <&reg_3v3>;
++		ldo4-supply = <&reg_3v3>;
++		system-power-controller;
++		ti,power-button;
++
++		regulators {
++			reg_vdd_core: buck1 {
++				regulator-name = "VDD_CORE";
++				regulator-min-microvolt = <750000>;
++				regulator-max-microvolt = <900000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			reg_1v8: buck2 {
++				regulator-name = "VCC1V8";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			reg_vdd_ddr: buck3 {
++				regulator-name = "VDD_LPDDR4";
++				regulator-min-microvolt = <1100000>;
++				regulator-max-microvolt = <1100000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			reg_sd_3v3_1v8: ldo1 {
++				regulator-name = "VDDSHV_SD_IO_PMIC";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-allow-bypass;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			reg_vddr_core: ldo2 {
++				regulator-name = "VDDAR_CORE";
++				regulator-min-microvolt = <850000>;
++				regulator-max-microvolt = <850000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			reg_1v8a: ldo3 {
++				regulator-name = "VDDA_1V8";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			reg_eth_2v5: ldo4 {
++				regulator-name = "VDD_PHY_2V5";
++				regulator-min-microvolt = <2500000>;
++				regulator-max-microvolt = <2500000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++		};
 +	};
 +};
 +
@@ -649,6 +692,61 @@ index 00000000000..d0597edbc80
 +	status = "okay";
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&main_gpio0_digital_pins>;
++
++	led_sys_red {
++		gpio-hog;
++		gpios = <62 GPIO_ACTIVE_HIGH>;
++		output-high;
++		line-name = "LED-SYS-RED";
++	};
++	led_sys_blue {
++		gpio-hog;
++		gpios = <46 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-SYS-BLUE";
++	};
++	led_sys_green {
++		gpio-hog;
++		gpios = <57 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-SYS-GREEN";
++	};
++	led_lte_red {
++		gpio-hog;
++		gpios = <63 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-LTE-RED";
++	};
++	led_lte_blue {
++		gpio-hog;
++		gpios = <48 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-LTE-BLUE";
++	};
++	led_lte_green {
++		gpio-hog;
++		gpios = <61 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-LTE-GREEN";
++	};
++	led_wifi_red {
++		gpio-hog;
++		gpios = <64 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-WIFI-RED";
++	};
++	led_wifi_blue {
++		gpio-hog;
++		gpios = <47 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-WIFI-BLUE";
++	};
++	led_wifi_green {
++		gpio-hog;
++		gpios = <58 GPIO_ACTIVE_HIGH>;
++		output-low;
++		line-name = "LED-WIFI-GREEN";
++	};
 +};
 +
 +&main_gpio1 {
@@ -702,6 +800,8 @@ index 00000000000..d0597edbc80
 +
 +	cpsw3g_phy1: ethernet-phy@1 {
 +		reg = <1>;
++		/* ti,max-output-impedance; */
++		ti,clk-output-sel = <DP83867_CLK_O_SEL_OFF>;
 +		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
 +		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_4_B_NIB>;
 +	};
@@ -716,11 +816,6 @@ index 00000000000..d0597edbc80
 +	mbox_main_r5fss0_core0: mbox-main-r5fss0-core0 {
 +		ti,mbox-rx = <0 0 2>;
 +		ti,mbox-tx = <1 0 2>;
-+	};
-+
-+	mbox_main_r5fss0_core1: mbox-main-r5fss0-core1 {
-+		ti,mbox-rx = <2 0 2>;
-+		ti,mbox-tx = <3 0 2>;
 +	};
 +};
 +
@@ -748,15 +843,13 @@ index 00000000000..d0597edbc80
 +};
 +
 +&main_r5fss0_core0 {
-+	mboxes = <&mailbox0_cluster2 &mbox_main_r5fss0_core0>;
++	mboxes = <&mailbox0_cluster2>, <&mbox_main_r5fss0_core0>;
 +	memory-region = <&main_r5fss0_core0_dma_memory_region>,
 +			<&main_r5fss0_core0_memory_region>;
 +};
 +
 +&main_r5fss0_core1 {
-+	mboxes = <&mailbox0_cluster2 &mbox_main_r5fss0_core1>;
-+	memory-region = <&main_r5fss0_core1_dma_memory_region>,
-+			<&main_r5fss0_core1_memory_region>;
++	status = "disabled";
 +};
 +
 +&main_r5fss1 {
@@ -798,12 +891,12 @@ index 00000000000..d0597edbc80
 +	phy-names = "pcie-phy";
 +	num-lanes = <1>;
 +};
-diff --git a/arch/arm/dts/k3-am642-r5-iolan.dts b/arch/arm/dts/k3-am642-r5-iolan.dts
-new file mode 100755
-index 00000000000..0baeee14e17
+diff --git a/arch/arm/dts/k3-am642-r5-igos.dts b/arch/arm/dts/k3-am642-r5-igos.dts
+new file mode 100644
+index 00000000000..453d63d29ef
 --- /dev/null
-+++ b/arch/arm/dts/k3-am642-r5-iolan.dts
-@@ -0,0 +1,298 @@
++++ b/arch/arm/dts/k3-am642-r5-igos.dts
+@@ -0,0 +1,312 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Copyright (C) 2020-2021 Texas Instruments Incorporated - https://www.ti.com/
@@ -816,17 +909,17 @@ index 00000000000..0baeee14e17
 +#include "k3-am642.dtsi"
 +#include "k3-am64-sk-lp4-1600MTs.dtsi"
 +#include "k3-am64-ddr.dtsi"
-+#include "k3-am64x-iolan-binman.dtsi"
++#include "k3-am64x-igos-binman.dtsi"
 +
 +/ {
 +	chosen {
-+		stdout-path = "serial2:115200n8";
++		stdout-path = "serial0:115200n8";
 +		tick-timer = &timer1;
 +	};
 +
 +	aliases {
-+		serial2 = &main_uart3;
-+		serial5 = &main_uart0;
++		serial0 = &main_uart3;
++		serial1 = &main_uart0;
 +
 +		ethernet0 = &cpsw_port2;
 +
@@ -1003,6 +1096,13 @@ index 00000000000..0baeee14e17
 +			AM64X_IOPAD(0x0144, PIN_OUTPUT, 4) /* (Y11) PRG1_PRU1_GPO15.RGMII2_TX_CTL */
 +		>;
 +	};
++
++	main_i2c0_pins_default: main-i2c0-pins-default {
++		pinctrl-single,pins = <
++			AM64X_IOPAD(0x0260, PIN_INPUT_PULLUP, 0)    /* (A18) I2C0_SCL */
++			AM64X_IOPAD(0x0264, PIN_INPUT_PULLUP, 0)    /* (B18) I2C0_SDA */
++		>;
++	};
 +};
 +
 +&dmsc {
@@ -1020,7 +1120,7 @@ index 00000000000..0baeee14e17
 +	/delete-property/ clock-names;
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&main_uart0_pins_default>;
-+	status = "disabled";
++	status = "okay";
 +};
 +
 +&main_uart1 {
@@ -1059,6 +1159,13 @@ index 00000000000..0baeee14e17
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&main_i2c0_pins_default>;
 +	clock-frequency = <400000>;
++
++	tps65219: pmic@30 {
++		compatible = "ti,tps65219";
++		reg = <0x30>;
++		system-power-controller;
++		ti,power-button;
++	};
 +};
 +
 +&main_i2c1 {
@@ -1101,23 +1208,23 @@ index 00000000000..0baeee14e17
 +	};
 +};
 +
-+#include "k3-am642-iolan-u-boot.dtsi"
-diff --git a/arch/arm/dts/k3-am64x-iolan-binman.dtsi b/arch/arm/dts/k3-am64x-iolan-binman.dtsi
-new file mode 100755
-index 00000000000..5f1daceda2c
++#include "k3-am642-igos-u-boot.dtsi"
+diff --git a/arch/arm/dts/k3-am64x-igos-binman.dtsi b/arch/arm/dts/k3-am64x-igos-binman.dtsi
+new file mode 100644
+index 00000000000..61562853e82
 --- /dev/null
-+++ b/arch/arm/dts/k3-am64x-iolan-binman.dtsi
++++ b/arch/arm/dts/k3-am64x-igos-binman.dtsi
 @@ -0,0 +1,428 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +// Copyright (C) 2022 Texas Instruments Incorporated - https://www.ti.com/
 +
 +#include "k3-binman.dtsi"
 +
-+#ifdef CONFIG_TARGET_AM642_R5_IOLAN
++#ifdef CONFIG_TARGET_AM642_R5_IGOS
 +
 +&binman {
-+	tiboot3-am64x_sr2-hs-iolan.bin {
-+		filename = "tiboot3-am64x_sr2-hs-iolan.bin";
++	tiboot3-am64x_sr2-hs-igos.bin {
++		filename = "tiboot3-am64x_sr2-hs-igos.bin";
 +		ti-secure-rom {
 +			content = <&u_boot_spl>, <&ti_sci_enc>,
 +				<&combined_sysfw_cfg>, <&sysfw_inner_cert>;
@@ -1155,8 +1262,8 @@ index 00000000000..5f1daceda2c
 +};
 +
 +&binman {
-+	tiboot3-am64x_sr2-hs-fs-iolan.bin {
-+		filename = "tiboot3-am64x_sr2-hs-fs-iolan.bin";
++	tiboot3-am64x_sr2-hs-fs-igos.bin {
++		filename = "tiboot3-am64x_sr2-hs-fs-igos.bin";
 +		symlink = "tiboot3.bin";
 +		ti-secure-rom {
 +			content = <&u_boot_spl_fs>, <&ti_sci_enc_fs>,
@@ -1195,8 +1302,8 @@ index 00000000000..5f1daceda2c
 +};
 +
 +&binman {
-+	tiboot3-am64x-gp-iolan.bin {
-+		filename = "tiboot3-am64x-gp-iolan.bin";
++	tiboot3-am64x-gp-igos.bin {
++		filename = "tiboot3-am64x-gp-igos.bin";
 +		ti-secure-rom {
 +			content = <&u_boot_spl_unsigned>, <&ti_sci_gp>, <&combined_sysfw_cfg_gp>;
 +			combined;
@@ -1226,13 +1333,13 @@ index 00000000000..5f1daceda2c
 +
 +#endif
 +
-+#ifdef CONFIG_TARGET_AM642_A53_IOLAN
++#ifdef CONFIG_TARGET_AM642_A53_IGOS
 +
 +#define SPL_NODTB "spl/u-boot-spl-nodtb.bin"
-+#define SPL_AM642_IOLAN_DTB "spl/dts/k3-am642-iolan.dtb"
++#define SPL_AM642_IGOS_DTB "spl/dts/k3-am642-igos.dtb"
 +
 +#define UBOOT_NODTB "u-boot-nodtb.bin"
-+#define AM642_IOLAN_DTB "u-boot.dtb"
++#define AM642_IGOS_DTB "u-boot.dtb"
 +
 +&binman {
 +	ti-spl {
@@ -1309,16 +1416,16 @@ index 00000000000..5f1daceda2c
 +				};
 +
 +				fdt-0 {
-+					description = "k3-am642-iolan";
++					description = "k3-am642-igos";
 +					type = "flat_dt";
 +					arch = "arm";
 +					compression = "none";
 +					ti-secure {
-+						content = <&spl_am64x_iolan_dtb>;
++						content = <&spl_am64x_igos_dtb>;
 +						keyfile = "custMpk.pem";
 +					};
-+					spl_am64x_iolan_dtb: blob-ext {
-+						filename = SPL_AM642_IOLAN_DTB;
++					spl_am64x_igos_dtb: blob-ext {
++						filename = SPL_AM642_IGOS_DTB;
 +					};
 +
 +				};
@@ -1328,7 +1435,7 @@ index 00000000000..5f1daceda2c
 +				default = "conf-0";
 +
 +				conf-0 {
-+					description = "k3-am642-iolan";
++					description = "k3-am642-igos";
 +					firmware = "atf";
 +					loadables = "tee", "dm", "spl";
 +					fdt = "fdt-0";
@@ -1366,17 +1473,17 @@ index 00000000000..5f1daceda2c
 +				};
 +
 +				fdt-0 {
-+					description = "k3-am642-iolan";
++					description = "k3-am642-igos";
 +					type = "flat_dt";
 +					arch = "arm";
 +					compression = "none";
 +					ti-secure {
-+						content = <&am64x_iolan_dtb>;
++						content = <&am64x_igos_dtb>;
 +						keyfile = "custMpk.pem";
 +
 +					};
-+					am64x_iolan_dtb: blob-ext {
-+						filename = AM642_IOLAN_DTB;
++					am64x_igos_dtb: blob-ext {
++						filename = AM642_IGOS_DTB;
 +					};
 +					hash {
 +						algo = "crc32";
@@ -1388,7 +1495,7 @@ index 00000000000..5f1daceda2c
 +				default = "conf-0";
 +
 +				conf-0 {
-+					description = "k3-am642-iolan";
++					description = "k3-am642-igos";
 +					firmware = "uboot";
 +					loadables = "uboot";
 +					fdt = "fdt-0";
@@ -1460,12 +1567,12 @@ index 00000000000..5f1daceda2c
 +				};
 +
 +				fdt-0 {
-+					description = "k3-am642-iolan";
++					description = "k3-am642-igos";
 +					type = "flat_dt";
 +					arch = "arm";
 +					compression = "none";
 +					blob {
-+						filename = SPL_AM642_IOLAN_DTB;
++						filename = SPL_AM642_IGOS_DTB;
 +					};
 +				};
 +			};
@@ -1474,7 +1581,7 @@ index 00000000000..5f1daceda2c
 +				default = "conf-0";
 +
 +				conf-0 {
-+					description = "k3-am642-iolan";
++					description = "k3-am642-igos";
 +					firmware = "atf";
 +					loadables = "tee", "dm", "spl";
 +					fdt = "fdt-0";
@@ -1509,12 +1616,12 @@ index 00000000000..5f1daceda2c
 +				};
 +
 +				fdt-0 {
-+					description = "k3-am642-iolan";
++					description = "k3-am642-igos";
 +					type = "flat_dt";
 +					arch = "arm";
 +					compression = "none";
 +					blob {
-+						filename = AM642_IOLAN_DTB;
++						filename = AM642_IGOS_DTB;
 +					};
 +					hash {
 +						algo = "crc32";
@@ -1526,7 +1633,7 @@ index 00000000000..5f1daceda2c
 +				default = "conf-0";
 +
 +				conf-0 {
-+					description = "k3-am642-iolan";
++					description = "k3-am642-igos";
 +					firmware = "uboot";
 +					loadables = "uboot";
 +					fdt = "fdt-0";
@@ -1537,39 +1644,672 @@ index 00000000000..5f1daceda2c
 +};
 +#endif
 diff --git a/arch/arm/mach-k3/Kconfig b/arch/arm/mach-k3/Kconfig
-index c5c909919d3..9fccebffd7b 100644
+index c5c909919d3..404b9f048d1 100644
 --- a/arch/arm/mach-k3/Kconfig
 +++ b/arch/arm/mach-k3/Kconfig
 @@ -215,4 +215,5 @@ source "board/siemens/iot2050/Kconfig"
  source "board/ti/j721s2/Kconfig"
  source "board/ti/j722s/Kconfig"
  source "board/ti/j784s4/Kconfig"
-+source "board/ti/iolan/Kconfig"
++source "board/perle/igos/Kconfig"
  endif
-diff --git a/board/ti/iolan/Kconfig b/board/ti/iolan/Kconfig
-new file mode 100755
-index 00000000000..73771aa3c98
+diff --git a/board/perle/common/Kconfig b/board/perle/common/Kconfig
+new file mode 100644
+index 00000000000..bfd6e80a0f3
 --- /dev/null
-+++ b/board/ti/iolan/Kconfig
++++ b/board/perle/common/Kconfig
+@@ -0,0 +1,59 @@
++config BOARD_HAS_32K_RTC_CRYSTAL
++	bool "Enable the 32k crystial for RTC"
++	help
++	   Some of Texas Instrument's Starter-Kit boards have
++	   an onboard 32k crystal. Select this option if you wish Uboot
++	   to enable this crystal for Linux
++	default n
++
++config PERLE_I2C_BOARD_DETECT
++	bool "Support for Board detection for Perle platforms"
++	help
++	   Support for detection board information on Perle Systems
++	   IGOS Boards which have I2C based EEPROM detection
++
++config EEPROM_BUS_ADDRESS
++	int "Board EEPROM's I2C bus address"
++	range 0 8
++	default 0
++	depends on PERLE_I2C_BOARD_DETECT
++
++config EEPROM_CHIP_ADDRESS
++	hex "Board EEPROM's I2C chip address"
++	range 0 0xff
++	default 0x50
++	depends on PERLE_I2C_BOARD_DETECT
++
++config CAPE_EEPROM_BUS_NUM
++	int "Cape EEPROM's I2C bus address"
++	range 0 8
++	default 2
++	depends on CMD_EXTENSION
++
++config TI_COMMON_CMD_OPTIONS
++	bool "Enable cmd options on TI platforms"
++	imply CMD_ASKENV
++	imply CMD_BOOTZ
++	imply CRC32_VERIFY if ARCH_KEYSTONE
++	imply CMD_DFU if USB_GADGET_DOWNLOAD
++	imply CMD_DHCP
++	imply CMD_EEPROM
++	imply CMD_EXT2
++	imply CMD_EXT4
++	imply CMD_EXT4_WRITE
++	imply CMD_FAT
++	imply FAT_WRITE if CMD_FAT
++	imply CMD_FS_GENERIC
++	imply CMD_GPIO
++	imply CMD_GPT
++	imply CMD_I2C
++	imply CMD_MII
++	imply CMD_MMC
++	imply CMD_PART
++	imply CMD_PING
++	imply CMD_PMIC if DM_PMIC
++	imply CMD_REGULATOR if DM_REGULATOR
++	imply CMD_SF if SPI_FLASH
++	imply CMD_SPI
++	imply CMD_TIME
++	imply CMD_USB if USB
+diff --git a/board/perle/common/Makefile b/board/perle/common/Makefile
+new file mode 100644
+index 00000000000..387d7188619
+--- /dev/null
++++ b/board/perle/common/Makefile
+@@ -0,0 +1,4 @@
++# SPDX-License-Identifier: GPL-2.0+
++# Copyright (C) 2015-2016 Texas Instruments Incorporated - http://www.ti.com/
++
++obj-${CONFIG_ARCH_K3} += k3-ddr-init.o
+diff --git a/board/perle/common/k3-ddr-init.c b/board/perle/common/k3-ddr-init.c
+new file mode 100644
+index 00000000000..228b95774b9
+--- /dev/null
++++ b/board/perle/common/k3-ddr-init.c
+@@ -0,0 +1,89 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2023, Texas Instruments Incorporated - https://www.ti.com/
++ */
++
++#include <fdt_support.h>
++#include <dm/uclass.h>
++#include <k3-ddrss.h>
++#include <spl.h>
++
++#include "k3-ddr-init.h"
++
++int dram_init(void)
++{
++	s32 ret;
++
++	ret = fdtdec_setup_mem_size_base_lowest();
++	if (ret)
++		printf("Error setting up mem size and base. %d\n", ret);
++
++	return ret;
++}
++
++int dram_init_banksize(void)
++{
++	s32 ret;
++
++	ret = fdtdec_setup_memory_banksize();
++	if (ret)
++		printf("Error setting up memory banksize. %d\n", ret);
++
++	return ret;
++}
++
++#if defined(CONFIG_SPL_BUILD)
++
++void fixup_ddr_driver_for_ecc(struct spl_image_info *spl_image)
++{
++	struct udevice *dev;
++	int ret, ctr = 1;
++
++	dram_init_banksize();
++
++	ret = uclass_get_device(UCLASS_RAM, 0, &dev);
++	if (ret)
++		panic("Cannnot get RAM device for ddr size fixup: %d\n", ret);
++
++	ret = k3_ddrss_ddr_fdt_fixup(dev, spl_image->fdt_addr, gd->bd);
++	if (ret)
++		printf("Error fixing up ddr node for ECC use! %d\n", ret);
++
++	dram_init_banksize();
++
++	ret = uclass_next_device_err(&dev);
++
++	while (!ret) {
++		ret = k3_ddrss_ddr_fdt_fixup(dev, spl_image->fdt_addr, gd->bd);
++		if (ret)
++			printf("Error fixing up ddr node %d for ECC use! %d\n", ctr, ret);
++
++		dram_init_banksize();
++		ret = uclass_next_device_err(&dev);
++		ctr++;
++	}
++}
++
++void fixup_memory_node(struct spl_image_info *spl_image)
++{
++	u64 start[CONFIG_NR_DRAM_BANKS];
++	u64 size[CONFIG_NR_DRAM_BANKS];
++	int bank;
++	int ret;
++
++	dram_init();
++	dram_init_banksize();
++
++	for (bank = 0; bank < CONFIG_NR_DRAM_BANKS; bank++) {
++		start[bank] = gd->bd->bi_dram[bank].start;
++		size[bank] = gd->bd->bi_dram[bank].size;
++	}
++
++	ret = fdt_fixup_memory_banks(spl_image->fdt_addr, start, size,
++				     CONFIG_NR_DRAM_BANKS);
++
++	if (ret)
++		printf("Error fixing up memory node! %d\n", ret);
++}
++
++#endif
+diff --git a/board/perle/common/k3-ddr-init.h b/board/perle/common/k3-ddr-init.h
+new file mode 100644
+index 00000000000..9d1826815df
+--- /dev/null
++++ b/board/perle/common/k3-ddr-init.h
+@@ -0,0 +1,15 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Copyright (C) 2023, Texas Instruments Incorporated - https://www.ti.com/
++ */
++
++#ifndef __K3_DDR_INIT_H
++#define __K3_DDR_INIT_H
++
++int dram_init(void);
++int dram_init_banksize(void);
++
++void fixup_ddr_driver_for_ecc(struct spl_image_info *spl_image);
++void fixup_memory_node(struct spl_image_info *spl_image);
++
++#endif /* __K3_DDR_INIT_H */
+diff --git a/board/perle/common/schema.yaml b/board/perle/common/schema.yaml
+new file mode 100644
+index 00000000000..8023ecb0e0f
+--- /dev/null
++++ b/board/perle/common/schema.yaml
+@@ -0,0 +1,436 @@
++# SPDX-License-Identifier: GPL-2.0+
++# Copyright (C) 2022 Texas Instruments Incorporated - https://www.ti.com/
++#
++# Config schema for TI K3 devices
++#
++
++---
++
++definitions:
++    u8:
++        type: integer
++        minimum: 0
++        maximum: 0xff
++    u16:
++        type: integer
++        minimum: 0
++        maximum: 0xffff
++    u32:
++        type: integer
++        minimum: 0
++        maximum: 0xffffffff
++
++
++
++type: object
++properties:
++    pm-cfg:
++        type: object
++        properties:
++            rev:
++                type: object
++                properties:
++                    boardcfg_abi_maj:
++                        $ref: "#/definitions/u8"
++                    boardcfg_abi_min:
++                        $ref: "#/definitions/u8"
++    board-cfg:
++        type: object
++        properties:
++            rev:
++                type: object
++                properties:
++                    boardcfg_abi_maj:
++                        $ref: "#/definitions/u8"
++                    boardcfg_abi_min:
++                        $ref: "#/definitions/u8"
++            control:
++                type: object
++                properties:
++                    subhdr:
++                        type: object
++                        properties:
++                            magic:
++                                $ref: "#/definitions/u16"
++                            size:
++                                $ref: "#/definitions/u16"
++                    main_isolation_enable:
++                        $ref: "#/definitions/u8"
++                    main_isolation_hostid:
++                        $ref: "#/definitions/u16"
++
++
++            secproxy:
++                type: object
++                properties:
++                    subhdr:
++                        type: object
++                        properties:
++                            magic:
++                                $ref: "#/definitions/u16"
++                            size:
++                                $ref: "#/definitions/u16"
++                    scaling_factor:
++                        $ref: "#/definitions/u8"
++                    scaling_profile:
++                        $ref: "#/definitions/u8"
++                    disable_main_nav_secure_proxy:
++                        $ref: "#/definitions/u8"
++
++            msmc:
++                type: object
++                properties:
++                    subhdr:
++                        type: object
++                        properties:
++                            magic:
++                                $ref: "#/definitions/u16"
++                            size:
++                                $ref: "#/definitions/u16"
++                    msmc_cache_size:
++                        $ref: "#/definitions/u8"
++            debug_cfg:
++                type: object
++                properties:
++                    subhdr:
++                        type: object
++                        properties:
++                            magic:
++                                $ref: "#/definitions/u16"
++                            size:
++                                $ref: "#/definitions/u16"
++                    trace_dst_enables:
++                        $ref: "#/definitions/u16"
++                    trace_src_enables:
++                        $ref: "#/definitions/u16"
++
++    sec-cfg:
++        type: object
++        properties:
++            rev:
++                type: object
++                properties:
++                    boardcfg_abi_maj:
++                        $ref: "#/definitions/u8"
++                    boardcfg_abi_min:
++                        $ref: "#/definitions/u8"
++
++            processor_acl_list:
++                type: object
++                properties:
++                    subhdr:
++                        type: object
++                        properties:
++                            magic:
++                                $ref: "#/definitions/u16"
++                            size:
++                                $ref: "#/definitions/u16"
++                    proc_acl_entries:
++                        type: array
++                        minItems: 32
++                        maxItems: 32
++                        items:
++                            type: object
++                            properties:
++                                processor_id:
++                                    $ref: "#/definitions/u8"
++                                proc_access_master:
++                                    $ref: "#/definitions/u8"
++                                proc_access_secondary:
++                                    type: array
++                                    minItems: 3
++                                    maxItems: 3
++                                    items:
++                                        $ref: "#/definitions/u8"
++            host_hierarchy:
++                type: object
++                properties:
++                    subhdr:
++                        type: object
++                        properties:
++                            magic:
++                                $ref: "#/definitions/u16"
++                            size:
++                                $ref: "#/definitions/u16"
++                    host_hierarchy_entries:
++                        type: array
++                        minItems: 32
++                        maxItems: 32
++                        items:
++                            type: object
++                            properties:
++                                host_id:
++                                    $ref: "#/definitions/u8"
++                                supervisor_host_id:
++                                    $ref: "#/definitions/u8"
++
++            otp_config:
++                type: object
++                properties:
++                    subhdr:
++                        type: object
++                        properties:
++                            magic:
++                                $ref: "#/definitions/u16"
++                            size:
++                                $ref: "#/definitions/u16"
++                    otp_entry:
++                        type: array
++                        minItems: 32
++                        maxItems: 32
++                        items:
++                            type: object
++                            properties:
++                                host_id:
++                                    $ref: "#/definitions/u8"
++                                host_perms:
++                                    $ref: "#/definitions/u8"
++                    write_host_id:
++                        $ref: "#/definitions/u8"
++
++            dkek_config:
++                type: object
++                properties:
++                    subhdr:
++                        type: object
++                        properties:
++                            magic:
++                                $ref: "#/definitions/u16"
++                            size:
++                                $ref: "#/definitions/u16"
++                    allowed_hosts:
++                        type: array
++                        minItems: 4
++                        maxItems: 4
++                        items:
++                            $ref: "#/definitions/u8"
++                    allow_dkek_export_tisci:
++                        $ref: "#/definitions/u8"
++                    rsvd:
++                        type: array
++                        minItems: 3
++                        maxItems: 3
++                        items:
++                            $ref: "#/definitions/u8"
++
++            sa2ul_cfg:
++                type: object
++                properties:
++                    subhdr:
++                        type: object
++                        properties:
++                            magic:
++                                $ref: "#/definitions/u16"
++                            size:
++                                $ref: "#/definitions/u16"
++                    rsvd:
++                        type: array
++                        minItems: 2
++                        maxItems: 4
++                        items:
++                            $ref: "#/definitions/u8"
++                    enable_saul_psil_global_config_writes:
++                        $ref: "#/definitions/u8"
++                    auth_resource_owner:
++                        $ref: "#/definitions/u8"
++
++            sec_dbg_config:
++                type: object
++                properties:
++                    subhdr:
++                        type: object
++                        properties:
++                            magic:
++                                $ref: "#/definitions/u16"
++                            size:
++                                $ref: "#/definitions/u16"
++                    allow_jtag_unlock:
++                        $ref: "#/definitions/u8"
++                    allow_wildcard_unlock:
++                        $ref: "#/definitions/u8"
++                    allowed_debug_level_rsvd:
++                        $ref: "#/definitions/u8"
++                    rsvd:
++                        $ref: "#/definitions/u8"
++                    min_cert_rev:
++                        $ref: "#/definitions/u32"
++                    jtag_unlock_hosts:
++                        type: array
++                        minItems: 4
++                        maxItems: 4
++                        items:
++                            $ref: "#/definitions/u8"
++
++
++            sec_handover_cfg:
++                type: object
++                properties:
++                    subhdr:
++                        type: object
++                        properties:
++                            magic:
++                                $ref: "#/definitions/u16"
++                            size:
++                                $ref: "#/definitions/u16"
++                    handover_msg_sender:
++                        $ref: "#/definitions/u8"
++                    handover_to_host_id:
++                        $ref: "#/definitions/u8"
++                    rsvd:
++                        type: array
++                        minItems: 4
++                        maxItems: 4
++                        items:
++                            $ref: "#/definitions/u8"
++
++    rm-cfg:
++        type: object
++        properties:
++            rm_boardcfg:
++                type: object
++                properties:
++                    rev:
++                        type: object
++                        properties:
++                            boardcfg_abi_maj:
++                                $ref: "#/definitions/u8"
++                            boardcfg_abi_min:
++                                $ref: "#/definitions/u8"
++
++                    host_cfg:
++                        type: object
++                        properties:
++                            subhdr:
++                                type: object
++                                properties:
++                                    magic:
++                                        $ref: "#/definitions/u16"
++                                    size:
++                                        $ref: "#/definitions/u16"
++                            host_cfg_entries:
++                                type: array
++                                minItems: 0
++                                maxItems: 32
++                                items:
++                                    type: object
++                                    properties:
++                                        host_id:
++                                            $ref: "#/definitions/u8"
++                                        allowed_atype:
++                                            $ref: "#/definitions/u8"
++                                        allowed_qos:
++                                            $ref: "#/definitions/u16"
++                                        allowed_orderid:
++                                            $ref: "#/definitions/u32"
++                                        allowed_priority:
++                                            $ref: "#/definitions/u16"
++                                        allowed_sched_priority:
++                                            $ref: "#/definitions/u8"
++                    resasg:
++                        type: object
++                        properties:
++                            subhdr:
++                                type: object
++                                properties:
++                                    magic:
++                                        $ref: "#/definitions/u16"
++                                    size:
++                                        $ref: "#/definitions/u16"
++                            resasg_entries_size:
++                                        $ref: "#/definitions/u16"
++                            reserved:
++                                        $ref: "#/definitions/u16"
++
++            resasg_entries:
++                type: array
++                minItems: 0
++                maxItems: 468
++                items:
++                    type: object
++                    properties:
++                        start_resource:
++                            $ref: "#/definitions/u16"
++                        num_resource:
++                            $ref: "#/definitions/u16"
++                        type:
++                            $ref: "#/definitions/u16"
++                        host_id:
++                            $ref: "#/definitions/u8"
++                        reserved:
++                            $ref: "#/definitions/u8"
++
++    tifs-rm-cfg:
++        type: object
++        properties:
++            rm_boardcfg:
++                type: object
++                properties:
++                    rev:
++                        type: object
++                        properties:
++                            boardcfg_abi_maj:
++                                $ref: "#/definitions/u8"
++                            boardcfg_abi_min:
++                                $ref: "#/definitions/u8"
++
++                    host_cfg:
++                        type: object
++                        properties:
++                            subhdr:
++                                type: object
++                                properties:
++                                    magic:
++                                        $ref: "#/definitions/u16"
++                                    size:
++                                        $ref: "#/definitions/u16"
++                            host_cfg_entries:
++                                type: array
++                                minItems: 0
++                                maxItems: 32
++                                items:
++                                    type: object
++                                    properties:
++                                        host_id:
++                                            $ref: "#/definitions/u8"
++                                        allowed_atype:
++                                            $ref: "#/definitions/u8"
++                                        allowed_qos:
++                                            $ref: "#/definitions/u16"
++                                        allowed_orderid:
++                                            $ref: "#/definitions/u32"
++                                        allowed_priority:
++                                            $ref: "#/definitions/u16"
++                                        allowed_sched_priority:
++                                            $ref: "#/definitions/u8"
++                    resasg:
++                        type: object
++                        properties:
++                            subhdr:
++                                type: object
++                                properties:
++                                    magic:
++                                        $ref: "#/definitions/u16"
++                                    size:
++                                        $ref: "#/definitions/u16"
++                            resasg_entries_size:
++                                        $ref: "#/definitions/u16"
++                            reserved:
++                                        $ref: "#/definitions/u16"
++
++            resasg_entries:
++                type: array
++                minItems: 0
++                maxItems: 468
++                items:
++                    type: object
++                    properties:
++                        start_resource:
++                            $ref: "#/definitions/u16"
++                        num_resource:
++                            $ref: "#/definitions/u16"
++                        type:
++                            $ref: "#/definitions/u16"
++                        host_id:
++                            $ref: "#/definitions/u8"
++                        reserved:
++                            $ref: "#/definitions/u8"
+diff --git a/board/perle/igos/Kconfig b/board/perle/igos/Kconfig
+new file mode 100644
+index 00000000000..455359c2970
+--- /dev/null
++++ b/board/perle/igos/Kconfig
 @@ -0,0 +1,59 @@
 +# SPDX-License-Identifier: GPL-2.0+
 +#
 +# Copyright (C) 2020-2021 Texas Instruments Incorporated - https://www.ti.com/
 +
 +choice
-+	prompt "Perle AM64 IOLAN based boards"
++	prompt "Perle AM64 IGOS based boards"
 +	optional
 +
-+config TARGET_AM642_A53_IOLAN
-+	bool "Perle K3 based AM642 IOLAN running on A53"
++config TARGET_AM642_A53_IGOS
++	bool "Perle K3 based AM642 IGOS running on A53"
 +	select ARM64
 +	select BINMAN
 +	imply BOARD
 +	imply SPL_BOARD
-+	imply TI_I2C_BOARD_DETECT
++	imply PERLE_I2C_BOARD_DETECT
 +
-+config TARGET_AM642_R5_IOLAN
-+	bool "Perle K3 based AM642 IOLAN running on R5"
++config TARGET_AM642_R5_IGOS
++	bool "Perle K3 based AM642 IGOS running on R5"
 +	select CPU_V7R
 +	select SYS_THUMB_BUILD
 +	select K3_LOAD_SYSFW
@@ -1578,58 +2318,58 @@ index 00000000000..73771aa3c98
 +	select K3_DDRSS
 +	select BINMAN
 +	imply SYS_K3_SPL_ATF
-+	imply TI_I2C_BOARD_DETECT
++	imply PERLE_I2C_BOARD_DETECT
 +
 +endchoice
 +
-+if TARGET_AM642_A53_IOLAN
++if TARGET_AM642_A53_IGOS
 +
 +config SYS_BOARD
-+       default "iolan"
++       default "igos"
 +
 +config SYS_VENDOR
-+       default "ti"
++       default "perle"
 +
 +config SYS_CONFIG_NAME
-+       default "am64x_iolan"
++       default "am64x_igos"
 +
-+source "board/ti/common/Kconfig"
++source "board/perle/common/Kconfig"
 +
 +endif
 +
-+if TARGET_AM642_R5_IOLAN
++if TARGET_AM642_R5_IGOS
 +
 +config SYS_BOARD
-+       default "iolan"
++       default "igos"
 +
 +config SYS_VENDOR
-+       default "ti"
++       default "perle"
 +
 +config SYS_CONFIG_NAME
-+       default "am64x_iolan"
++       default "am64x_igos"
 +
-+source "board/ti/common/Kconfig"
++source "board/perle/common/Kconfig"
 +
 +endif
-diff --git a/board/ti/iolan/MAINTAINERS b/board/ti/iolan/MAINTAINERS
-new file mode 100755
-index 00000000000..cf3492dcdb0
+diff --git a/board/perle/igos/MAINTAINERS b/board/perle/igos/MAINTAINERS
+new file mode 100644
+index 00000000000..e0b45a60d4b
 --- /dev/null
-+++ b/board/ti/iolan/MAINTAINERS
++++ b/board/perle/igos/MAINTAINERS
 @@ -0,0 +1,8 @@
-+AM64x IOLAN BOARD
++AM64x IGOS BOARD
 +M:	Vignesh Raghavendra <vigneshr@ti.com>
 +M:	Jack Kim <jkim@perle.com>
 +S:	Maintained
-+F:	board/ti/iolan/
-+F:	include/configs/am64x_iolan.h
-+F:	configs/am64x_iolan_r5_defconfig
-+F:	configs/am64x_iolan_a53_defconfig
-diff --git a/board/ti/iolan/Makefile b/board/ti/iolan/Makefile
-new file mode 100755
-index 00000000000..b575e058248
++F:	board/perle/igos/
++F:	include/configs/am64x_igos.h
++F:	configs/am64x_igos_r5_defconfig
++F:	configs/am64x_igos_a53_defconfig
+diff --git a/board/perle/igos/Makefile b/board/perle/igos/Makefile
+new file mode 100644
+index 00000000000..7431a8c1e3a
 --- /dev/null
-+++ b/board/ti/iolan/Makefile
++++ b/board/perle/igos/Makefile
 @@ -0,0 +1,8 @@
 +#
 +# Copyright (C) 2020-2021 Texas Instruments Incorporated - https://www.ti.com/
@@ -1638,12 +2378,12 @@ index 00000000000..b575e058248
 +# SPDX-License-Identifier:     GPL-2.0+
 +#
 +
-+obj-y	+= iolan.o
-diff --git a/board/ti/iolan/board-cfg.yaml b/board/ti/iolan/board-cfg.yaml
-new file mode 100755
++obj-y	+= igos.o
+diff --git a/board/perle/igos/board-cfg.yaml b/board/perle/igos/board-cfg.yaml
+new file mode 100644
 index 00000000000..f1f7c68d504
 --- /dev/null
-+++ b/board/ti/iolan/board-cfg.yaml
++++ b/board/perle/igos/board-cfg.yaml
 @@ -0,0 +1,37 @@
 +# SPDX-License-Identifier: GPL-2.0+
 +# Copyright (C) 2022 Texas Instruments Incorporated - https://www.ti.com/
@@ -1682,12 +2422,12 @@ index 00000000000..f1f7c68d504
 +                trace_dst_enables : 0x00
 +                trace_src_enables : 0x00
 +
-diff --git a/board/ti/iolan/iolan.c b/board/ti/iolan/iolan.c
-new file mode 100755
-index 00000000000..e990ba0d43e
+diff --git a/board/perle/igos/igos.c b/board/perle/igos/igos.c
+new file mode 100644
+index 00000000000..50c89e9e899
 --- /dev/null
-+++ b/board/ti/iolan/iolan.c
-@@ -0,0 +1,394 @@
++++ b/board/perle/igos/igos.c
+@@ -0,0 +1,393 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Board specific initialization for AM642 EVM
@@ -1708,31 +2448,55 @@ index 00000000000..e990ba0d43e
 +#include <asm/arch/hardware.h>
 +#include <asm/arch/sys_proto.h>
 +#include <env.h>
-+
-+#include "../common/board_detect.h"
++#include <dm.h>
++#include <i2c.h>
++#include <net.h>
++#include <string.h>
 +#include "../common/k3-ddr-init.h"
 +
-+#define board_is_am64x_gpevm() (board_ti_k3_is("AM64-GPEVM") || \
-+				board_ti_k3_is("AM64-EVM") || \
-+				board_ti_k3_is("AM64-HSEVM"))
++#define AT24C04_BUF_SIZE		512		/* 4K bit = 512 bytes */
++#define PERLE_AM6_KEY_LEN		16
++#define PERLE_AM6_VALUE_LEN		32
++#define MAX_EEPROM_RECORDS		16
++#define ETH_ADDR_LEN			6
 +
-+#define board_is_am64x_skevm() (board_ti_k3_is("AM64-SKEVM") || \
-+				board_ti_k3_is("AM64B-SKEVM"))
++#define DEFAULT_PROD_ID			"igos"
++#define DEFAULT_MODEL_ID		"1000"
++#define ENV_PREFIX				"board"
 +
-+#define AM64X_MAX_DAUGHTER_CARDS	8
++#define IGOS_EEPROM_KEYS \
++	X(EE_MFG_ID,   "mfg_id")   \
++	X(EE_HW_VER,   "hw_ver")   \
++	X(EE_SW_VER,   "sw_ver")   \
++	X(EE_PROD_ID,  "prod_id")  \
++	X(EE_MODEL,    "model")    \
++	X(EE_MAC,      "mac")      \
++	X(EE_SERIAL,   "serial")   \
++	X(EE_SSID,     "ssid")     \
++	X(EE_PASSWORD, "password")
 +
-+/* Daughter card presence detection signals */
-+enum {
-+	AM64X_EVM_HSE_BRD_DET,
-+	AM64X_EVM_BRD_DET_COUNT,
++enum igos_eeprom_index {
++#define X(enum_name, str) enum_name,
++	IGOS_EEPROM_KEYS
++#undef X
++	NUM_IGOS_KEYS /* This automatically becomes the total count (8) */
 +};
 +
-+#define AM642_NAND_DTBO		"k3-am642-evm-nand.dtbo"
++static const char * const igos_keys[] = {
++#define X(enum_name, str) str,
++	IGOS_EEPROM_KEYS
++#undef X
++};
 +
-+static struct gpio_desc board_det_gpios[AM64X_EVM_BRD_DET_COUNT];
++struct perle_am6_eeprom_record_board_info {
++	char key[PERLE_AM6_KEY_LEN];
++	char value[PERLE_AM6_VALUE_LEN];
++} __attribute__ ((__packed__));
 +
-+/* Max number of MAC addresses that are parsed/processed per daughter card */
-+#define DAUGHTER_CARD_NO_OF_MAC_ADDR	8
++/* Memory location to keep a copy of the AM6 board info record */
++#define PERLE_AM6_EEPROM_BD_INFO_DATA ((struct perle_am6_eeprom_record_board_info *) \
++					     TI_SRAM_SCRATCH_BOARD_EEPROM_START)
++static int eeprom_kv_count = 0;
 +
 +DECLARE_GLOBAL_DATA_PTR;
 +
@@ -1741,26 +2505,10 @@ index 00000000000..e990ba0d43e
 +	return 0;
 +}
 +
-+static bool is_nand;
 +#if defined(CONFIG_SPL_LOAD_FIT)
 +int board_fit_config_name_match(const char *name)
 +{
-+	bool eeprom_read = board_ti_was_eeprom_read();
-+
-+	if (!eeprom_read || board_is_am64x_gpevm()) {
-+		if (is_nand) {
-+			if (!strcmp(name, "k3-am642-r5-evm") || !strcmp(name, "k3-am642-evm-nand"))
-+				return 0;
-+		} else {
-+			if (!strcmp(name, "k3-am642-r5-evm") || !strcmp(name, "k3-am642-evm"))
-+				return 0;
-+		}
-+	} else if (board_is_am64x_skevm()) {
-+		if (!strcmp(name, "k3-am642-r5-sk") || !strcmp(name, "k3-am642-sk"))
-+			return 0;
-+	}
-+
-+	return -1;
++	return 0;
 +}
 +#endif
 +
@@ -1804,32 +2552,189 @@ index 00000000000..e990ba0d43e
 +}
 +#endif
 +
-+#ifdef CONFIG_TI_I2C_BOARD_DETECT
++#ifdef CONFIG_PERLE_I2C_BOARD_DETECT
++static void dump_eeprom_kv(void)
++{
++	int i;
++	struct perle_am6_eeprom_record_board_info *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++
++	if (eeprom_kv_count > 0) {
++		printf("== EEPROM Key Value. Total (%d) data available. ==\n", eeprom_kv_count);
++		for (i = 0; i < eeprom_kv_count; i++) {
++			printf("[%d] %-16s : %-32s\n", i, ep[i].key, ep[i].value);
++		}
++		printf("===================================================\n");
++	} else {
++		printf("eeprom_kv_count (%d) is not valid!\n", eeprom_kv_count);
++	}
++}
++
++static int is_key_predefined(const char *key, int *found_idx)
++{
++	for (int i = 0; i < NUM_IGOS_KEYS; i++) {
++		if (strcmp(igos_keys[i], key) == 0) {
++			if (found_idx)
++				*found_idx = i;
++			return 1; /* Key is valid */
++		}
++	}
++	return 0; /* Key is invalid/unexpected */
++}
++
++const char *get_eeprom_key_by_index(int index)
++{
++	struct perle_am6_eeprom_record_board_info *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++
++	if (index >= eeprom_kv_count)
++		return NULL;
++
++	return ep[index].key;
++}
++
++const char *get_eeprom_value_by_index(int index)
++{
++	struct perle_am6_eeprom_record_board_info *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++
++	if (index >= eeprom_kv_count)
++		return NULL;
++
++	return ep[index].value;
++}
++
++/* Parses the entire buffer into the key-value array once */
++static void parse_eeprom_to_kv(char *buf)
++{
++	char *line;
++	char *line_ptr = buf;
++	struct perle_am6_eeprom_record_board_info *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++	int index;
++
++	for (int i = 0; i < NUM_IGOS_KEYS; i++) {
++		strncpy(ep[i].key, igos_keys[i], sizeof(ep[0].key) - 1);
++		ep[i].key[sizeof(ep[0].key) - 1] = '\0';
++		ep[i].value[0] = '\0';
++	}
++	eeprom_kv_count = NUM_IGOS_KEYS;
++
++	while ((line = strsep(&line_ptr, "\r\n")) != NULL) {
++		/* Skip empty lines caused by consecutive \r\n characters */
++		if (*line == '\0')
++			continue;
++
++		char *key_ptr = line;
++		char *key = strsep(&key_ptr, "=");
++		char *val = strsep(&key_ptr, "=");
++
++		if (key && val && *key != '\0' && *val != '\0') {
++			if (is_key_predefined(key, &index)) {
++				strncpy(ep[index].value, val, sizeof(ep[0].value) - 1);
++				ep[index].value[sizeof(ep[0].value) - 1] = '\0';
++			} else {
++				printf("WARNING: EEPROM KEY(%s) is not pre-defined..\n", key);
++				if (eeprom_kv_count >= MAX_EEPROM_RECORDS) {
++					printf("WARNING: kv count (%d) is bigger than max records (%d) Discard this info (%s : %s)\n",
++						eeprom_kv_count, MAX_EEPROM_RECORDS, key, val);
++					continue;
++				}
++				strncpy(ep[eeprom_kv_count].key, key, sizeof(ep[0].key) - 1);
++				ep[eeprom_kv_count].key[sizeof(ep[0].key) - 1] = '\0';
++				strncpy(ep[eeprom_kv_count].value, val, sizeof(ep[0].value) - 1);
++				ep[eeprom_kv_count].value[sizeof(ep[0].value) - 1] = '\0';
++				eeprom_kv_count++;
++			}
++		}
++	}
++	if (is_key_predefined("EE_PROD_ID", &index)) {
++		if (ep[index].value[0] == '\0') {
++			printf("INFO: EE_PROD_ID not found in EEPROM. Setting default: %s\n", DEFAULT_PROD_ID);
++			strncpy(ep[index].value, DEFAULT_PROD_ID, sizeof(ep[0].value) - 1);
++			ep[index].value[sizeof(ep[0].value) - 1] = '\0';
++		}
++	}
++	if (is_key_predefined("EE_MODEL", &index)) {
++		if (ep[index].value[0] == '\0') {
++			printf("INFO: EE_MODEL not found in EEPROM. Setting default: %s\n", DEFAULT_MODEL_ID);
++			strncpy(ep[index].value, DEFAULT_MODEL_ID, sizeof(ep[0].value) - 1);
++			ep[index].value[sizeof(ep[0].value) - 1] = '\0';
++		}
++	}
++}
++
++#ifdef CONFIG_BOARD_LATE_INIT
++static int set_env_mac_addr(const char *mac_str)
++{
++	u8 mac_addr[ETH_ADDR_LEN];
++
++	if (!mac_str) {
++		printf("Error: mac string is NULL\n");
++		return -1;
++	}
++
++	string_to_enetaddr(mac_str, mac_addr);
++	if (is_valid_ethaddr(mac_addr)) {
++		eth_env_set_enetaddr_by_index("eth", 0, mac_addr);
++	} else {
++		printf("Invalid mac address (%s) = converted (%pM)\n", mac_str, mac_addr);
++	}
++
++	return 0;
++}
++
++static int set_env_value(const char *key, const char *value)
++{
++	char envkey[PERLE_AM6_KEY_LEN + sizeof(ENV_PREFIX)];
++
++	if (!key || !value) {
++		printf("%s: Invalid key(%s) and/or value(%s)\n", __func__, key, value);
++		return -1;
++	}
++	snprintf(envkey, sizeof(envkey), "%s_%s", ENV_PREFIX, key);
++	env_set(envkey, value);
++	return 0;
++}
++#endif
++
 +int do_board_detect(void)
 +{
-+	int ret = 1;
-+#if 0  // PERLE - do not read eeprom. Note: Setting CONFIG_TI_I2C_BOARD_DETECT to 'not set', breaks the build
-+	ret = ti_i2c_eeprom_am6_get_base(CONFIG_EEPROM_BUS_ADDRESS,
-+					 CONFIG_EEPROM_CHIP_ADDRESS);
-+	if (ret) {
-+		printf("EEPROM not available at 0x%02x, trying to read at 0x%02x\n",
-+			CONFIG_EEPROM_CHIP_ADDRESS, CONFIG_EEPROM_CHIP_ADDRESS + 1);
-+		ret = ti_i2c_eeprom_am6_get_base(CONFIG_EEPROM_BUS_ADDRESS,
-+						 CONFIG_EEPROM_CHIP_ADDRESS + 1);
-+		if (ret)
-+			pr_err("Reading on-board EEPROM at 0x%02x failed %d\n",
-+			       CONFIG_EEPROM_CHIP_ADDRESS + 1, ret);
++	int rc;
++	uint8_t eep_buf[AT24C04_BUF_SIZE];
++	struct udevice *dev;
++	struct udevice *bus;
++
++	if (eeprom_kv_count > 0) {
++		debug("%s: EEPROM has already been read\n", __func__);
++		return 0;
 +	}
-+#endif
-+	return ret;
++
++	#if CONFIG_IS_ENABLED(DM_I2C)
++	rc = uclass_get_device_by_seq(UCLASS_I2C, CONFIG_EEPROM_BUS_ADDRESS, &bus);
++	if (rc)
++		return rc;
++	rc = dm_i2c_probe(bus, CONFIG_EEPROM_CHIP_ADDRESS, 0, &dev);
++	if (rc)
++		return rc;
++
++	rc = dm_i2c_read(dev, 0, eep_buf, sizeof(eep_buf) - 1);
++	if (rc) {
++		pr_err("Reading on-board EEPROM at i2c%d - 0x%02x failed %d\n",
++			       CONFIG_EEPROM_BUS_ADDRESS, CONFIG_EEPROM_CHIP_ADDRESS, rc);
++		return rc;
++	}
++	#endif
++	eep_buf[sizeof(eep_buf) - 1] = '\0';
++
++	parse_eeprom_to_kv(eep_buf);
++	dump_eeprom_kv();
++
++	return rc;
 +}
 +
 +int checkboard(void)
 +{
-+	struct ti_am6_eeprom *ep = TI_AM6_EEPROM_DATA;
-+
-+	if (!do_board_detect())
-+		printf("Board: %s rev %s\n", ep->name, ep->version);
++	if (!do_board_detect()) {
++		printf("Model: %s-%s, hw-ver %s, sw-ver %s\n", get_eeprom_value_by_index(EE_PROD_ID), 
++			get_eeprom_value_by_index(EE_MODEL), get_eeprom_value_by_index(EE_HW_VER), get_eeprom_value_by_index(EE_SW_VER));
++	}
 +
 +	return 0;
 +}
@@ -1837,23 +2742,17 @@ index 00000000000..e990ba0d43e
 +#ifdef CONFIG_BOARD_LATE_INIT
 +static void setup_board_eeprom_env(void)
 +{
-+	char *name = "am64x_gpevm";
++	char board_name[128];
 +
-+	if (do_board_detect())
-+		goto invalid_eeprom;
-+
-+	if (board_is_am64x_gpevm())
-+		name = "am64x_gpevm";
-+	else if (board_is_am64x_skevm())
-+		name = "am64x_skevm";
-+	else
-+		printf("Unidentified board claims %s in eeprom header\n",
-+		       board_ti_get_name());
-+
-+invalid_eeprom:
-+	set_board_info_env_am6(name);
++	if (do_board_detect()) {
++		snprintf(board_name, sizeof(board_name), "%s-%s", DEFAULT_PROD_ID, DEFAULT_MODEL_ID);
++	} else {
++		snprintf(board_name, sizeof(board_name), "%s-%s", get_eeprom_value_by_index(EE_PROD_ID), get_eeprom_value_by_index(EE_MODEL));
++	}
++	env_set("board_name", board_name);
 +}
 +
++#if 0
 +static void setup_serial(void)
 +{
 +	struct ti_am6_eeprom *ep = TI_AM6_EEPROM_DATA;
@@ -1875,187 +2774,31 @@ index 00000000000..e990ba0d43e
 +}
 +#endif
 +#endif
-+
-+static const char *k3_dtbo_list[AM64X_MAX_DAUGHTER_CARDS] = {NULL};
-+
-+static int init_daughtercard_det_gpio(char *gpio_name, struct gpio_desc *desc)
-+{
-+	int ret;
-+
-+	memset(desc, 0, sizeof(*desc));
-+
-+	ret = dm_gpio_lookup_name(gpio_name, desc);
-+	if (ret < 0) {
-+		pr_err("Failed to lookup gpio %s: %d\n", gpio_name, ret);
-+		return ret;
-+	}
-+
-+	/* Request GPIO, simply re-using the name as label */
-+	ret = dm_gpio_request(desc, gpio_name);
-+	if (ret < 0) {
-+		pr_err("Failed to request gpio %s: %d\n", gpio_name, ret);
-+		return ret;
-+	}
-+
-+	return dm_gpio_set_dir_flags(desc, GPIOD_IS_IN);
-+}
-+
-+static int probe_daughtercards(void)
-+{
-+	struct ti_am6_eeprom ep;
-+	char mac_addr[DAUGHTER_CARD_NO_OF_MAC_ADDR][TI_EEPROM_HDR_ETH_ALEN];
-+	u8 mac_addr_cnt;
-+	char name_overlays[1024] = { 0 };
-+	int i, nb_dtbos = 0;
-+	int ret;
-+
-+	/*
-+	 * Daughter card presence detection signal name to GPIO (via I2C I/O
-+	 * expander @ address 0x38) name and EEPROM I2C address mapping.
-+	 */
-+	const struct {
-+		char *gpio_name;
-+		u8 i2c_addr;
-+	} slot_map[AM64X_EVM_BRD_DET_COUNT] = {
-+		{ "gpio@38_0", 0x52, },	/* AM64X_EVM_HSE_BRD_DET */
-+	};
-+
-+	/* Declaration of daughtercards to probe */
-+	const struct {
-+		u8 slot_index;		/* Slot the card is installed */
-+		char *card_name;	/* EEPROM-programmed card name */
-+		char *dtbo_name;	/* Device tree overlay to apply */
-+		u8 eth_offset;		/* ethXaddr MAC address index offset */
-+	} cards[] = {
-+		{
-+			AM64X_EVM_HSE_BRD_DET,
-+			"TMDS64DC02EVM",
-+			AM642_NAND_DTBO,
-+			0,
-+		},
-+	};
-+
-+	/*
-+	 * Initialize GPIO used for daughtercard slot presence detection and
-+	 * keep the resulting handles in local array for easier access.
-+	 */
-+	for (i = 0; i < AM64X_EVM_BRD_DET_COUNT; i++) {
-+		ret = init_daughtercard_det_gpio(slot_map[i].gpio_name,
-+						 &board_det_gpios[i]);
-+		if (ret < 0)
-+			return ret;
-+	}
-+
-+	memset(k3_dtbo_list, 0, sizeof(k3_dtbo_list));
-+	for (i = 0; i < ARRAY_SIZE(cards); i++) {
-+		/* Obtain card-specific slot index and associated I2C address */
-+		u8 slot_index = cards[i].slot_index;
-+		u8 i2c_addr = slot_map[slot_index].i2c_addr;
-+		const char *dtboname;
-+
-+		/*
-+		 * The presence detection signal is active-low, hence skip
-+		 * over this card slot if anything other than 0 is returned.
-+		 */
-+		ret = dm_gpio_get_value(&board_det_gpios[slot_index]);
-+		if (ret < 0)
-+			return ret;
-+		else if (ret)
-+			continue;
-+
-+		/* Get and parse the daughter card EEPROM record */
-+		ret = ti_i2c_eeprom_am6_get(CONFIG_EEPROM_BUS_ADDRESS, i2c_addr,
-+					    &ep,
-+					    (char **)mac_addr,
-+					    DAUGHTER_CARD_NO_OF_MAC_ADDR,
-+					    &mac_addr_cnt);
-+		if (ret) {
-+			pr_err("Reading daughtercard EEPROM at 0x%02x failed %d\n",
-+			       i2c_addr, ret);
-+			/*
-+			 * Even this is pretty serious let's just skip over
-+			 * this particular daughtercard, rather than ending
-+			 * the probing process altogether.
-+			 */
-+			continue;
-+		}
-+
-+		/* Only process the parsed data if we found a match */
-+		if (strncmp(ep.name, cards[i].card_name, sizeof(ep.name)))
-+			continue;
-+
-+		printf("Detected: %s rev %s\n", ep.name, ep.version);
-+
-+#ifndef CONFIG_SPL_BUILD
-+		int j;
-+		/*
-+		 * Populate any MAC addresses from daughtercard into the U-Boot
-+		 * environment, starting with a card-specific offset so we can
-+		 * have multiple cards contribute to the MAC pool in a well-
-+		 * defined manner.
-+		 */
-+		for (j = 0; j < mac_addr_cnt; j++) {
-+			if (!is_valid_ethaddr((u8 *)mac_addr[j]))
-+				continue;
-+
-+			eth_env_set_enetaddr_by_index("eth",
-+						      cards[i].eth_offset + j,
-+						      (uchar *)mac_addr[j]);
-+		}
 +#endif
-+
-+		/* Skip if no overlays are to be added */
-+		if (!strlen(cards[i].dtbo_name))
-+			continue;
-+
-+		dtboname = cards[i].dtbo_name;
-+		k3_dtbo_list[nb_dtbos++] = dtboname;
-+
-+		if (!strcmp(dtboname, AM642_NAND_DTBO))
-+			is_nand = true;
-+
-+		/*
-+		 * Make sure we are not running out of buffer space by checking
-+		 * if we can fit the new overlay, a trailing space to be used
-+		 * as a separator, plus the terminating zero.
-+		 */
-+		if (strlen(name_overlays) + strlen(dtboname) + 2 >
-+		    sizeof(name_overlays))
-+			return -ENOMEM;
-+
-+		/* Append to our list of overlays */
-+		strcat(name_overlays, dtboname);
-+		strcat(name_overlays, " ");
-+	}
-+
-+#ifndef CONFIG_SPL_BUILD
-+	/* Apply device tree overlay(s) to the U-Boot environment, if any */
-+	if (strlen(name_overlays))
-+		return env_set("name_overlays", name_overlays);
-+#endif
-+
-+	return 0;
-+}
 +
 +#ifdef CONFIG_BOARD_LATE_INIT
 +int board_late_init(void)
 +{
-+	if (IS_ENABLED(CONFIG_TI_I2C_BOARD_DETECT)) {
-+		struct ti_am6_eeprom *ep = TI_AM6_EEPROM_DATA;
++	if (IS_ENABLED(CONFIG_PERLE_I2C_BOARD_DETECT)) {
++		int i;
++		const char *key, *value;
 +
 +		setup_board_eeprom_env();
-+		setup_serial();
-+		/*
-+		 * The first MAC address for ethernet a.k.a. ethernet0 comes from
-+		 * efuse populated via the am654 gigabit eth switch subsystem driver.
-+		 * All the other ones are populated via EEPROM, hence continue with
-+		 * an index of 1.
-+		 */
-+		board_ti_am6_set_ethaddr(1, ep->mac_addr_cnt);
++		//setup_serial();
 +
-+		/* Check for and probe any plugged-in daughtercards */
-+		if (board_is_am64x_gpevm())
-+			probe_daughtercards();
++		for (i = 0; i < eeprom_kv_count; i++) {
++			key = get_eeprom_key_by_index(i);
++			value = get_eeprom_value_by_index(i);
++			if (key && value && *key != '\0' && *value != '\0') {
++				if (i == EE_MAC) {
++					set_env_mac_addr(value);
++				} else {
++					set_env_value(key, value);
++				}
++			} else {
++				printf("Invalid EEPROM parsed data. Key (%s), Value(%s)\n", key, value);
++			}
++		}
 +	}
 +
 +	return 0;
@@ -2076,17 +2819,13 @@ index 00000000000..e990ba0d43e
 +
 +	/* Init DRAM size for R5/A53 SPL */
 +	dram_init_banksize();
-+
-+	/* Check for and probe any plugged-in daughtercards */
-+	if (board_is_am64x_gpevm())
-+		probe_daughtercards();
 +}
 +#endif
-diff --git a/board/ti/iolan/iolan.env b/board/ti/iolan/iolan.env
-new file mode 100755
-index 00000000000..88a34abda49
+diff --git a/board/perle/igos/igos.env b/board/perle/igos/igos.env
+new file mode 100644
+index 00000000000..a21297ff9f4
 --- /dev/null
-+++ b/board/ti/iolan/iolan.env
++++ b/board/perle/igos/igos.env
 @@ -0,0 +1,59 @@
 +#include <environment/ti/ti_armv7_common.env>
 +#include <environment/ti/mmc.env>
@@ -2100,7 +2839,7 @@ index 00000000000..88a34abda49
 +mtdparts=omap2-nand.0:2m(NAND.tiboot3),2m(NAND.tispl),2m(NAND.tiboot3.backup),4m(NAND.u-boot),256k(NAND.u-boot-env),256k(NAND.u-boot-env.backup),-(NAND.file-system)
 +
 +findfdt= 
-+	setenv name_fdt ti/k3-am642-iolan.dtb;
++	setenv name_fdt perle/k3-am642-${board_prod_id}-${board_model}.dtb;
 +	setenv fdtfile ${name_fdt}
 +name_kern=Image
 +console=ttyS0,115200n8
@@ -2147,11 +2886,11 @@ index 00000000000..88a34abda49
 +fw_storage_interface=mmc
 +fw_dev_part=1:2
 +#endif
-diff --git a/board/ti/iolan/pm-cfg.yaml b/board/ti/iolan/pm-cfg.yaml
-new file mode 100755
+diff --git a/board/perle/igos/pm-cfg.yaml b/board/perle/igos/pm-cfg.yaml
+new file mode 100644
 index 00000000000..c97495f482e
 --- /dev/null
-+++ b/board/ti/iolan/pm-cfg.yaml
++++ b/board/perle/igos/pm-cfg.yaml
 @@ -0,0 +1,12 @@
 +# SPDX-License-Identifier: GPL-2.0+
 +# Copyright (C) 2022 Texas Instruments Incorporated - https://www.ti.com/
@@ -2165,11 +2904,11 @@ index 00000000000..c97495f482e
 +        rev:
 +                boardcfg_abi_maj : 0x0
 +                boardcfg_abi_min : 0x1
-diff --git a/board/ti/iolan/rm-cfg.yaml b/board/ti/iolan/rm-cfg.yaml
-new file mode 100755
+diff --git a/board/perle/igos/rm-cfg.yaml b/board/perle/igos/rm-cfg.yaml
+new file mode 100644
 index 00000000000..1e6b07aef68
 --- /dev/null
-+++ b/board/ti/iolan/rm-cfg.yaml
++++ b/board/perle/igos/rm-cfg.yaml
 @@ -0,0 +1,1400 @@
 +# SPDX-License-Identifier: GPL-2.0+
 +# Copyright (C) 2022 Texas Instruments Incorporated - https://www.ti.com/
@@ -3571,11 +4310,11 @@ index 00000000000..1e6b07aef68
 +                type: 2124
 +                host_id: 128
 +                reserved: 0
-diff --git a/board/ti/iolan/sec-cfg.yaml b/board/ti/iolan/sec-cfg.yaml
-new file mode 100755
+diff --git a/board/perle/igos/sec-cfg.yaml b/board/perle/igos/sec-cfg.yaml
+new file mode 100644
 index 00000000000..2779f2943dc
 --- /dev/null
-+++ b/board/ti/iolan/sec-cfg.yaml
++++ b/board/perle/igos/sec-cfg.yaml
 @@ -0,0 +1,380 @@
 +# SPDX-License-Identifier: GPL-2.0+
 +# Copyright (C) 2022 Texas Instruments Incorporated - https://www.ti.com/
@@ -3957,11 +4696,180 @@ index 00000000000..2779f2943dc
 +                handover_msg_sender : 0
 +                handover_to_host_id : 0
 +                rsvd: [0, 0, 0, 0]
-diff --git a/configs/am64x_iolan_a53_defconfig b/configs/am64x_iolan_a53_defconfig
-new file mode 100755
-index 00000000000..22ccaba7252
+diff --git a/board/perle/keys/custMpk.crt b/board/perle/keys/custMpk.crt
+new file mode 100644
+index 00000000000..01bd64aae57
 --- /dev/null
-+++ b/configs/am64x_iolan_a53_defconfig
++++ b/board/perle/keys/custMpk.crt
+@@ -0,0 +1,33 @@
++-----BEGIN CERTIFICATE-----
++MIIFwzCCA6sCFHKW0ueol0+vsilVaZyqKhppo9ryMA0GCSqGSIb3DQEBCwUAMIGd
++MQswCQYDVQQGEwJVUzELMAkGA1UECAwCVFgxDzANBgNVBAcMBkRhbGxhczEnMCUG
++A1UECgweVGV4YXMgSW5zdHJ1bWVudHMgSW5jb3Jwb3JhdGVkMRMwEQYDVQQLDApQ
++cm9jZXNzb3JzMRMwEQYDVQQDDApUSSBTdXBwb3J0MR0wGwYJKoZIhvcNAQkBFg5z
++dXBwb3J0QHRpLmNvbTAeFw0yMzA2MDEwNTIxMTZaFw0zMzA1MjkwNTIxMTZaMIGd
++MQswCQYDVQQGEwJVUzELMAkGA1UECAwCVFgxDzANBgNVBAcMBkRhbGxhczEnMCUG
++A1UECgweVGV4YXMgSW5zdHJ1bWVudHMgSW5jb3Jwb3JhdGVkMRMwEQYDVQQLDApQ
++cm9jZXNzb3JzMRMwEQYDVQQDDApUSSBTdXBwb3J0MR0wGwYJKoZIhvcNAQkBFg5z
++dXBwb3J0QHRpLmNvbTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAL8U
++rknYf3LTayPN60gOZdwiTfIOT4L27bXy3dt8kfpuWf/V97beBB2KzNKV2dHgxMH4
++UL//SAyRIlCaTHuL85YKKCazpNngqVVBGvs+Wydsv8rAca8vciLuRgElYq0+xwT2
++sRi2LMASbg/imz7lpqCoBkUDQRdOFh+pdNaETtZ5pxC4EakOkh8l3X+x8tG58mjY
++M1lLgn13zNGc+iO0+1iI8s3q1RbyLHUt+mLDwQlu4AZw4LUHCZli2dbk52xtyIIH
++UJP34tjt0V/j0J7Pk1TZX91dzjdg8asUigR7Zae6f99FRXxLoVuuTsaUPYxOh9KU
++PKTzn9r88jZ85w2tWkI38SqB0G6hp2cDHoftALtzSmgoMaKCmqMEweiH/0V+qsGf
++1DsFx4P9IXH+vX84yRYZUg7mAzONHR7JNhzNTp2CKYjNmyq+bF97srI6eQBqffWt
++Gp0ezVgqz170ToCrO0/d+NTeNKLEINlZGS2FAl4faLFMjbkRBuktdrVYjFCoN25m
++eG+DMEZNNJ+0GEq5u/p7xa7WMhCEhGw/moAzNfxNvNVuYFRQz35tgJcE+o8LIP29
++mCuhN71Z/UrsRaEJixfJchQztwVeEl3iWh3OIVT24erVVaon600J3xlAgi5miRdl
++2W6z1jhOjWEW1nTU3hZfURnVQriD0sjeS6lpl7aNAgMBAAEwDQYJKoZIhvcNAQEL
++BQADggIBAHy+h1FQKedFTJWgqGJkTwtcym5LyXD6ig8LyhJpVEbXmqK7ZKY2F2hB
++PqVbfCZNogszIvl8q3ykz+tcGbfBk3rq+KMUwbk5E29mSMmAJ9DNNozudgKkKq9w
++RmcO1bXCEspFgNvNEkYAQCBvMOyH/nCyFu9QzOzN35XIzf0fI3jM6rueLxSXq3xO
++7yHUZ3mzAZp6e1Qo6cuABAw1q6KqKYJCnJ3Nq6F42bmGp8mSD+2AuGV8cU+7Z3sh
++k/ooFMCsulj1R5+TlKgEfqspQXbefEsvRW3n3ZD8bcQF0ytiX7XVmDMFVpQkTzps
++92fjZ08Zcj7bCZQsFXXACIQkMiTiiMW6NwLFZDyq11/B1oe1bhjFUuqqUkHC/PKx
++gdWRwluGRt+onFRD5/upXnugKT99j/hQ7sy80a64A1xoCcKVbwcHU7YBQG1vLk6D
++idg0vI3gj7v+/jZEPkv/KrqAI6YuvpplkcHkEKuAUFAkozvVJ5pPK3K0xHBJGNMK
++kJ9FMAakFj6jfZaR5Ay3ZuOAn5oPMwd6RaauNOzVpBll6DFOyw2rU6fbId/gi841
++drmBfM6ufue6ecslkp9zSOpPLXhjt2g9NRVKPE20CmRetVSDLcMFet7ZImbxqggw
++yjDxA7oR+Px+o+xr+djcDlfj6500Rys6W1SNHe99HXOCcpQqivX0
++-----END CERTIFICATE-----
+diff --git a/board/perle/keys/custMpk.key b/board/perle/keys/custMpk.key
+new file mode 100644
+index 00000000000..adba378c800
+--- /dev/null
++++ b/board/perle/keys/custMpk.key
+@@ -0,0 +1,51 @@
++-----BEGIN RSA PRIVATE KEY-----
++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
++-----END RSA PRIVATE KEY-----
+diff --git a/board/perle/keys/custMpk.pem b/board/perle/keys/custMpk.pem
+new file mode 100644
+index 00000000000..adba378c800
+--- /dev/null
++++ b/board/perle/keys/custMpk.pem
+@@ -0,0 +1,51 @@
++-----BEGIN RSA PRIVATE KEY-----
++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
++-----END RSA PRIVATE KEY-----
+diff --git a/board/perle/keys/ti-degenerate-key.pem b/board/perle/keys/ti-degenerate-key.pem
+new file mode 100644
+index 00000000000..bd7d3745ade
+--- /dev/null
++++ b/board/perle/keys/ti-degenerate-key.pem
+@@ -0,0 +1,10 @@
++-----BEGIN RSA PRIVATE KEY-----
++MIIBWwIBAAKBgQDRfrnXQaP0k6vRK/gZ+bDflSU6y1JagGeQ/b+QYuiDz14japog
++8fRSu5WBsAxaSaySAUwS3L9Ppw+hGMecmyIJ494aMfZTtk1g49gU58joduiRnu7e
++QSZHMnehhuNlfD7A2tAAKnxIYuabs8zHYM/SS9Ne7t3kIQMbKfUSzNy6qQIBAQIB
++AQJBAOelUA376o6w3HkShXfN+shaOZYqFuTJ9exLMwsLp7DZKXB5F9I4JJ+Vkvho
++k6QWs7vkhleLSYUZknXHYm26ZE0CQQDnhTtd4PTBoZPjPXOeYMJFtEdMNy0XP6ey
++bcce389ugoY7BEkvASrd8PHgJQHziepgWOG4DGp33c64Hfq4zI3NAgEBAgEBAkA0
++RbK4uqoLciQluesTPU6lBy7Se3Dw0F9xBqlF5SR4KI6q+zQrHpBKyFOofMHZgizR
++iCrL55cxEM146zMw3AnF
++-----END RSA PRIVATE KEY-----
+diff --git a/configs/am64x_igos_a53_defconfig b/configs/am64x_igos_a53_defconfig
+new file mode 100644
+index 00000000000..bba14e8b46e
+--- /dev/null
++++ b/configs/am64x_igos_a53_defconfig
 @@ -0,0 +1,2309 @@
 +#
 +# Automatically generated file; DO NOT EDIT.
@@ -3990,9 +4898,9 @@ index 00000000000..22ccaba7252
 +CONFIG_SYS_ARCH="arm"
 +CONFIG_SYS_CPU="armv8"
 +CONFIG_SYS_SOC="k3"
-+CONFIG_SYS_VENDOR="ti"
-+CONFIG_SYS_BOARD="iolan"
-+CONFIG_SYS_CONFIG_NAME="am64x_iolan"
++CONFIG_SYS_VENDOR="perle"
++CONFIG_SYS_BOARD="igos"
++CONFIG_SYS_CONFIG_NAME="am64x_igos"
 +
 +#
 +# Skipping low level initialization functions
@@ -4147,7 +5055,6 @@ index 00000000000..22ccaba7252
 +CONFIG_SYS_MALLOC_LEN=0x2000000
 +CONFIG_SYS_MALLOC_F_LEN=0x8000
 +# CONFIG_BOARD_HAS_32K_RTC_CRYSTAL is not set
-+CONFIG_TI_I2C_BOARD_DETECT=y
 +CONFIG_EEPROM_BUS_ADDRESS=0
 +CONFIG_EEPROM_CHIP_ADDRESS=0x50
 +CONFIG_TI_COMMON_CMD_OPTIONS=y
@@ -4176,17 +5083,18 @@ index 00000000000..22ccaba7252
 +CONFIG_SPL_LDSCRIPT="arch/arm/cpu/armv8/u-boot-spl.lds"
 +CONFIG_ENV_SOURCE_FILE=""
 +# CONFIG_TARGET_IOT2050_A53 is not set
-+CONFIG_TARGET_AM642_A53_IOLAN=y
-+# CONFIG_TARGET_AM642_R5_IOLAN is not set
++CONFIG_TARGET_AM642_A53_IGOS=y
++# CONFIG_TARGET_AM642_R5_IGOS is not set
++CONFIG_PERLE_I2C_BOARD_DETECT=y
 +CONFIG_HAS_CUSTOM_SYS_INIT_SP_ADDR=y
 +CONFIG_CUSTOM_SYS_INIT_SP_ADDR=0x80480000
 +CONFIG_ENV_SIZE=0x20000
 +CONFIG_ENV_OFFSET=0x3E0000
 +CONFIG_DM_GPIO=y
 +CONFIG_SPL_DM_SPI=y
-+CONFIG_DEFAULT_DEVICE_TREE="k3-am642-iolan"
++CONFIG_DEFAULT_DEVICE_TREE="k3-am642-igos"
 +CONFIG_SPL_TEXT_BASE=0x80080000
-+CONFIG_SYS_PROMPT="IOLAN-2A > "
++CONFIG_SYS_PROMPT="IGOS> "
 +CONFIG_MULTI_DTB_FIT_UNCOMPRESS_SZ=0x8000
 +CONFIG_DM_RESET=y
 +CONFIG_SPL_MMC=y
@@ -4942,7 +5850,7 @@ index 00000000000..22ccaba7252
 +# CONFIG_OF_BOARD is not set
 +# CONFIG_OF_OMIT_DTB is not set
 +CONFIG_DEVICE_TREE_INCLUDES=""
-+CONFIG_OF_LIST="k3-am642-iolan"
++CONFIG_OF_LIST="k3-am642-igos"
 +CONFIG_OF_OVERLAY_LIST=""
 +# CONFIG_MULTI_DTB_FIT_LZO is not set
 +# CONFIG_MULTI_DTB_FIT_GZIP is not set
@@ -4950,7 +5858,7 @@ index 00000000000..22ccaba7252
 +# CONFIG_DTB_RESELECT is not set
 +CONFIG_MULTI_DTB_FIT=y
 +CONFIG_SPL_MULTI_DTB_FIT=y
-+CONFIG_SPL_OF_LIST="k3-am642-iolan"
++CONFIG_SPL_OF_LIST="k3-am642-igos"
 +# CONFIG_SPL_MULTI_DTB_FIT_LZO is not set
 +# CONFIG_SPL_MULTI_DTB_FIT_GZIP is not set
 +CONFIG_SPL_MULTI_DTB_FIT_NO_COMPRESSION=y
@@ -5207,7 +6115,7 @@ index 00000000000..22ccaba7252
 +# CONFIG_FWU_MDATA is not set
 +CONFIG_GPIO=y
 +CONFIG_SPL_DM_GPIO=y
-+# CONFIG_GPIO_HOG is not set
++CONFIG_GPIO_HOG=y
 +# CONFIG_SPL_GPIO_HOG is not set
 +# CONFIG_DM_GPIO_LOOKUP_LABEL is not set
 +# CONFIG_SPL_DM_GPIO_LOOKUP_LABEL is not set
@@ -6272,11 +7180,11 @@ index 00000000000..22ccaba7252
 +CONFIG_TOOLS_SHA512=y
 +# CONFIG_TOOLS_MKEFICAPSULE is not set
 +# CONFIG_FSPI_CONF_HEADER is not set
-diff --git a/configs/am64x_iolan_r5_defconfig b/configs/am64x_iolan_r5_defconfig
-new file mode 100755
-index 00000000000..e35bd320fdf
+diff --git a/configs/am64x_igos_r5_defconfig b/configs/am64x_igos_r5_defconfig
+new file mode 100644
+index 00000000000..4eaf866f128
 --- /dev/null
-+++ b/configs/am64x_iolan_r5_defconfig
++++ b/configs/am64x_igos_r5_defconfig
 @@ -0,0 +1,2229 @@
 +#
 +# Automatically generated file; DO NOT EDIT.
@@ -6305,9 +7213,9 @@ index 00000000000..e35bd320fdf
 +CONFIG_SYS_ARCH="arm"
 +CONFIG_SYS_CPU="armv7"
 +CONFIG_SYS_SOC="k3"
-+CONFIG_SYS_VENDOR="ti"
-+CONFIG_SYS_BOARD="iolan"
-+CONFIG_SYS_CONFIG_NAME="am64x_iolan"
++CONFIG_SYS_VENDOR="perle"
++CONFIG_SYS_BOARD="igos"
++CONFIG_SYS_CONFIG_NAME="am64x_igos"
 +
 +#
 +# Skipping low level initialization functions
@@ -6457,7 +7365,6 @@ index 00000000000..e35bd320fdf
 +CONFIG_SYS_MALLOC_LEN=0x2000000
 +CONFIG_SYS_MALLOC_F_LEN=0x80000
 +# CONFIG_BOARD_HAS_32K_RTC_CRYSTAL is not set
-+CONFIG_TI_I2C_BOARD_DETECT=y
 +CONFIG_EEPROM_BUS_ADDRESS=0
 +CONFIG_EEPROM_CHIP_ADDRESS=0x50
 +# CONFIG_TI_COMMON_CMD_OPTIONS is not set
@@ -6492,17 +7399,18 @@ index 00000000000..e35bd320fdf
 +CONFIG_SPL_LDSCRIPT="arch/arm/mach-omap2/u-boot-spl.lds"
 +CONFIG_ENV_SOURCE_FILE=""
 +# CONFIG_TARGET_IOT2050_A53 is not set
-+# CONFIG_TARGET_AM642_A53_IOLAN is not set
-+CONFIG_TARGET_AM642_R5_IOLAN=y
++# CONFIG_TARGET_AM642_A53_IGOS is not set
++CONFIG_TARGET_AM642_R5_IGOS=y
++CONFIG_PERLE_I2C_BOARD_DETECT=y
 +CONFIG_HAS_CUSTOM_SYS_INIT_SP_ADDR=y
 +CONFIG_CUSTOM_SYS_INIT_SP_ADDR=0x7019b800
 +CONFIG_ENV_SIZE=0x20000
 +CONFIG_ENV_OFFSET=0x3E0000
 +CONFIG_DM_GPIO=y
 +CONFIG_SPL_DM_SPI=y
-+CONFIG_DEFAULT_DEVICE_TREE="k3-am642-r5-iolan"
++CONFIG_DEFAULT_DEVICE_TREE="k3-am642-r5-igos"
 +CONFIG_SPL_TEXT_BASE=0x70000000
-+CONFIG_SYS_PROMPT="IOLAN-2A > "
++CONFIG_SYS_PROMPT="IGOS> "
 +CONFIG_MULTI_DTB_FIT_UNCOMPRESS_SZ=0x8000
 +CONFIG_DM_RESET=y
 +CONFIG_SPL_MMC=y
@@ -7215,11 +8123,11 @@ index 00000000000..e35bd320fdf
 +# CONFIG_OF_BOARD is not set
 +# CONFIG_OF_OMIT_DTB is not set
 +CONFIG_DEVICE_TREE_INCLUDES=""
-+CONFIG_OF_LIST="k3-am642-r5-iolan"
++CONFIG_OF_LIST="k3-am642-r5-igos"
 +CONFIG_OF_OVERLAY_LIST=""
 +# CONFIG_MULTI_DTB_FIT is not set
 +CONFIG_SPL_MULTI_DTB_FIT=y
-+CONFIG_SPL_OF_LIST="k3-am642-r5-iolan"
++CONFIG_SPL_OF_LIST="k3-am642-r5-igos"
 +# CONFIG_SPL_MULTI_DTB_FIT_LZO is not set
 +# CONFIG_SPL_MULTI_DTB_FIT_GZIP is not set
 +CONFIG_SPL_MULTI_DTB_FIT_NO_COMPRESSION=y
@@ -7468,8 +8376,8 @@ index 00000000000..e35bd320fdf
 +# CONFIG_FWU_MDATA is not set
 +CONFIG_GPIO=y
 +CONFIG_SPL_DM_GPIO=y
-+# CONFIG_GPIO_HOG is not set
-+# CONFIG_SPL_GPIO_HOG is not set
++CONFIG_GPIO_HOG=y
++CONFIG_SPL_GPIO_HOG=y
 +# CONFIG_DM_GPIO_LOOKUP_LABEL is not set
 +# CONFIG_SPL_DM_GPIO_LOOKUP_LABEL is not set
 +# CONFIG_ALTERA_PIO is not set
@@ -8507,11 +9415,11 @@ index 00000000000..e35bd320fdf
 +CONFIG_TOOLS_SHA512=y
 +# CONFIG_TOOLS_MKEFICAPSULE is not set
 +# CONFIG_FSPI_CONF_HEADER is not set
-diff --git a/include/configs/am64x_iolan.h b/include/configs/am64x_iolan.h
-new file mode 100755
-index 00000000000..43f4348b8d5
+diff --git a/include/configs/am64x_igos.h b/include/configs/am64x_igos.h
+new file mode 100644
+index 00000000000..76dd1fdac44
 --- /dev/null
-+++ b/include/configs/am64x_iolan.h
++++ b/include/configs/am64x_igos.h
 @@ -0,0 +1,40 @@
 +/* SPDX-License-Identifier: GPL-2.0+ */
 +/*
@@ -8521,8 +9429,8 @@ index 00000000000..43f4348b8d5
 + *	Keerthy <j-keerthy@ti.com>
 + */
 +
-+#ifndef __CONFIG_AM642_IOLAN_H
-+#define __CONFIG_AM642_IOLAN_H__CONFIG_AM642_IOLAN_H
++#ifndef __CONFIG_AM642_IGOS_H
++#define __CONFIG_AM642_IGOS_H
 +
 +#include <linux/sizes.h>
 +#include <config_distro_bootcmd.h>
@@ -8552,4 +9460,4 @@ index 00000000000..43f4348b8d5
 +#define CFG_SYS_NAND_ECCBYTES		14
 +/*-- end NAND config --*/
 +
-+#endif /* __CONFIG_AM642_IOLAN_H */
++#endif /* __CONFIG_AM642_IGOS_H */

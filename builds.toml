@@ -23,7 +23,7 @@ builds = [
     "bookworm-am64xx-evm",
     "bookworm-rt-am64xx-evm",
     "bookworm-j7200-evm",
-    "bookworm-am64xx-iolan",
+    "bookworm-am64xx-igos",
 ]
 
 # List of all valid trixie builds
@@ -133,7 +133,7 @@ builds = [
     distro_codename = "bookworm"
     rt_linux = "false"
 
-[bookworm-am64xx-iolan]
-    machine = "am64xx-iolan"
+[bookworm-am64xx-igos]
+    machine = "am64xx-igos"
     distro_codename = "bookworm"
     rt_linux = "false"

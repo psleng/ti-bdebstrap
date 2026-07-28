@@ -8,7 +8,7 @@
 [bookworm-j7200-evm]
     bsp_version = "09.02.00.011"
 
-[bookworm-am64xx-iolan]
+[bookworm-am64xx-igos]
     bsp_version = "09.02.00.010"
 
 # BSP Configurations

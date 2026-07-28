@@ -8,7 +8,7 @@ if [ "$BUILDTYPE" = "bookworm-am64xx-evm" ]; then
     ARM_A_CORE=a53
 elif [ "$BUILDTYPE" = "bookworm-j7200-evm" ]; then
     ARM_A_CORE=a72
-elif [ "$BUILDTYPE" = "bookworm-am64xx-iolan" ]; then
+elif [ "$BUILDTYPE" = "bookworm-am64xx-igos" ]; then
     ARM_A_CORE=a53
 else
     echo "=== E: $0: Undefined BUILDTARG:BUILDTYPE ($BUILDTARG:$BUILDTYPE)"

@@ -10,7 +10,7 @@ index 4beef8cdb33..05c49f92700 100644
 +			      k3-am642-evm-nand.dtbo \
 +			      k3-am642-igos.dtb \
 +			      k3-am642-r5-igos.dtb
- 
+
  dtb-$(CONFIG_SOC_K3_AM625) += k3-am625-sk.dtb \
  			      k3-am625-r5-sk.dtb \
 diff --git a/arch/arm/dts/k3-am642-igos-u-boot.dtsi b/arch/arm/dts/k3-am642-igos-u-boot.dtsi
@@ -2732,7 +2732,7 @@ index 00000000000..50c89e9e899
 +int checkboard(void)
 +{
 +	if (!do_board_detect()) {
-+		printf("Model: %s-%s, hw-ver %s, sw-ver %s\n", get_eeprom_value_by_index(EE_PROD_ID), 
++		printf("Model: %s-%s, hw-ver %s, sw-ver %s\n", get_eeprom_value_by_index(EE_PROD_ID),
 +			get_eeprom_value_by_index(EE_MODEL), get_eeprom_value_by_index(EE_HW_VER), get_eeprom_value_by_index(EE_SW_VER));
 +	}
 +
@@ -2838,7 +2838,7 @@ index 00000000000..a21297ff9f4
 +mtdids=nand0=omap2-nand.0
 +mtdparts=omap2-nand.0:2m(NAND.tiboot3),2m(NAND.tispl),2m(NAND.tiboot3.backup),4m(NAND.u-boot),256k(NAND.u-boot-env),256k(NAND.u-boot-env.backup),-(NAND.file-system)
 +
-+findfdt= 
++findfdt=
 +	setenv name_fdt perle/k3-am642-${board_prod_id}-${board_model}.dtb;
 +	setenv fdtfile ${name_fdt}
 +name_kern=Image
@@ -5877,12 +5877,12 @@ index 00000000000..bba14e8b46e
 +# CONFIG_OVERWRITE_ETHADDR_ONCE is not set
 +CONFIG_ENV_MIN_ENTRIES=64
 +CONFIG_ENV_MAX_ENTRIES=512
-+# CONFIG_ENV_IS_NOWHERE is not set
++CONFIG_ENV_IS_NOWHERE=y
 +# CONFIG_ENV_IS_IN_EEPROM is not set
 +# CONFIG_ENV_IS_IN_FAT is not set
 +# CONFIG_ENV_IS_IN_EXT4 is not set
 +# CONFIG_ENV_IS_IN_FLASH is not set
-+CONFIG_ENV_IS_IN_MMC=y
++# CONFIG_ENV_IS_IN_MMC is not set
 +# CONFIG_ENV_IS_IN_NAND is not set
 +# CONFIG_ENV_IS_IN_NVRAM is not set
 +# CONFIG_ENV_IS_IN_ONENAND is not set

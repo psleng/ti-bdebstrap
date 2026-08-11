@@ -6,6 +6,139 @@
 
 # set -x
 
+legacy_boot_layout() {
+    BOOT3OFFSET=0
+    SPLOFFSET=0x800
+    UBOOTOFFSET=0x1800
+    BOOTIMG_SIZE_BYTES=$((7 * 1024 * 1024))
+
+    case "$machine" in
+        am64xx-evm|j7200-evm)
+            ;;
+        *)
+            SPLOFFSET=0x700
+            UBOOTOFFSET=0x1000
+            BOOTIMG_SIZE_BYTES=$((4 * 1024 * 1024))
+            ;;
+    esac
+}
+
+derive_boot_layout_from_uboot_env() {
+    local uboot_src="$topdir/build/$distro/bsp_sources/ti-u-boot"
+    local env_dir="$uboot_src/include/environment/ti"
+    local igos_r5_cfg="$uboot_src/configs/am64x_igos_r5_defconfig"
+    local igos_a53_cfg="$uboot_src/configs/am64x_igos_a53_defconfig"
+    local board_env=""
+    local dfu_env_file=""
+    local block=""
+
+    # iGOS-specific source-of-truth: patched defconfigs use raw-mode sectors.
+    # - r5 defconfig sector is where tiboot3 loads tispl.bin
+    # - a53 defconfig sector is where tispl loads u-boot.img
+    if [ -f "$igos_r5_cfg" ] && [ -f "$igos_a53_cfg" ]; then
+        local r5_sector a53_sector
+        r5_sector=$(awk -F= '/^CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR=/{print $2; exit}' "$igos_r5_cfg")
+        a53_sector=$(awk -F= '/^CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR=/{print $2; exit}' "$igos_a53_cfg")
+        if [ -n "$r5_sector" ] && [ -n "$a53_sector" ]; then
+            BOOT3OFFSET=0
+            SPLOFFSET="$r5_sector"
+            UBOOTOFFSET="$a53_sector"
+            BOOTIMG_SIZE_BYTES=$((4 * 1024 * 1024))
+            echo "I: $0: Derived iGOS boot layout from defconfigs: tiboot3=$BOOT3OFFSET tispl=$SPLOFFSET u-boot=$UBOOTOFFSET bytes=$BOOTIMG_SIZE_BYTES" >&2
+            return 0
+        fi
+    fi
+
+    case "$machine" in
+        am64xx-evm)
+            board_env="$uboot_src/board/ti/am64x/am64x.env"
+            ;;
+        j7200-evm)
+            board_env="$uboot_src/board/ti/j721e/j721e.env"
+            ;;
+        *)
+            board_env="$uboot_src/board/ti/am64x/am64x.env"
+            ;;
+    esac
+
+    if [ -f "$board_env" ]; then
+        # Pick k3_dfu*.env included by board env. If multiple are present (preprocessor branches),
+        # prefer k3_dfu_combined.env because it matches current K3 eMMC combined layout.
+        local includes
+        includes=$(grep -oE 'k3_dfu[^>]*\.env' "$board_env" | awk '!seen[$0]++' || true)
+        if echo "$includes" | grep -q '^k3_dfu_combined\.env$'; then
+            dfu_env_file="k3_dfu_combined.env"
+        elif [ -n "$includes" ]; then
+            dfu_env_file=$(echo "$includes" | head -n1)
+        fi
+    fi
+
+    if [ -z "$dfu_env_file" ]; then
+        if [ -f "$env_dir/k3_dfu_combined.env" ]; then
+            dfu_env_file="k3_dfu_combined.env"
+        elif [ -f "$env_dir/k3_dfu.env" ]; then
+            dfu_env_file="k3_dfu.env"
+        fi
+    fi
+
+    if [ -z "$dfu_env_file" ] || [ ! -f "$env_dir/$dfu_env_file" ]; then
+        echo "W: $0: Cannot locate TI U-Boot DFU env file; using legacy boot layout" >&2
+        legacy_boot_layout
+        return 0
+    fi
+
+    # Extract dfu_alt_info_emmc block only.
+    block=$(awk '
+        /^dfu_alt_info_emmc=/ {inblk=1; next}
+        inblk && /^[[:space:]]*[A-Za-z0-9_]+=/{exit}
+        inblk {print}
+    ' "$env_dir/$dfu_env_file")
+
+    if [ -z "$block" ]; then
+        echo "W: $0: dfu_alt_info_emmc missing in $dfu_env_file; using legacy boot layout" >&2
+        legacy_boot_layout
+        return 0
+    fi
+
+    local tiboot_line tispl_line uboot_line
+    tiboot_line=$(echo "$block" | tr ';' '\n' | grep -E '^[[:space:]]*tiboot3\.bin\.raw[[:space:]]+raw[[:space:]]+' | head -n1 || true)
+    tispl_line=$(echo "$block" | tr ';' '\n' | grep -E '^[[:space:]]*tispl\.bin\.raw[[:space:]]+raw[[:space:]]+' | head -n1 || true)
+    uboot_line=$(echo "$block" | tr ';' '\n' | grep -E '^[[:space:]]*u-boot\.img\.raw[[:space:]]+raw[[:space:]]+' | head -n1 || true)
+
+    if [ -z "$tiboot_line" ] || [ -z "$tispl_line" ] || [ -z "$uboot_line" ]; then
+        echo "W: $0: Missing one or more raw boot entries in $dfu_env_file; using legacy boot layout" >&2
+        legacy_boot_layout
+        return 0
+    fi
+
+    BOOT3OFFSET=$(echo "$tiboot_line" | awk '{print $3}')
+    SPLOFFSET=$(echo "$tispl_line" | awk '{print $3}')
+    UBOOTOFFSET=$(echo "$uboot_line" | awk '{print $3}')
+
+    # Size image to cover full dfu_alt_info_emmc raw span (including u-env/sysfw if present).
+    local max_end=0
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        local end_hex end_dec
+        end_hex=$(echo "$line" | awk '{print $4}')
+        end_dec=$((end_hex))
+        if [ "$end_dec" -gt "$max_end" ]; then
+            max_end="$end_dec"
+        fi
+    done <<EOF
+$(echo "$block" | tr ';' '\n' | grep -E '^[[:space:]]*[^[:space:]]+\.raw[[:space:]]+raw[[:space:]]+')
+EOF
+
+    if [ "$max_end" -le 0 ]; then
+        echo "W: $0: Could not compute image size from $dfu_env_file; using legacy boot layout" >&2
+        legacy_boot_layout
+        return 0
+    fi
+
+    BOOTIMG_SIZE_BYTES=$((max_end * 512))
+    echo "I: $0: Derived boot layout from $dfu_env_file: tiboot3=$BOOT3OFFSET tispl=$SPLOFFSET u-boot=$UBOOTOFFSET bytes=$BOOTIMG_SIZE_BYTES" >&2
+}
+
 function mkdeb() {
     # Make a .deb of u-boot
     dir="$1"
@@ -36,6 +169,25 @@ function mkdeb() {
     # The data
     mkdir -p $PKG/usr/lib/$PKGNAME/platform
     cp -pr "$dir"/* $PKG/usr/lib/$PKGNAME/platform
+
+    # Add a single raw boot image payload built from tiboot3.bin, tispl.bin, u-boot.img
+    derive_boot_layout_from_uboot_env
+
+    TIBOOT3="$dir/tiboot3.bin"
+    TISPL="$dir/tispl.bin"
+    UBOOTIMG="$dir/u-boot.img"
+    RAW_BOOT_IMG="$PKG/usr/lib/$PKGNAME/platform/u-boot-raw-boot-${machine}.img"
+    RAW_BOOT_IMG_LATEST="$PKG/usr/lib/$PKGNAME/platform/u-boot-raw-boot.img"
+
+    if [ -f "$TIBOOT3" ] && [ -f "$TISPL" ] && [ -f "$UBOOTIMG" ]; then
+        truncate -s "$BOOTIMG_SIZE_BYTES" "$RAW_BOOT_IMG"
+        dd if="$TIBOOT3" of="$RAW_BOOT_IMG" bs=512 seek="$BOOT3OFFSET" conv=notrunc status=none
+        dd if="$TISPL" of="$RAW_BOOT_IMG" bs=512 seek="$((SPLOFFSET))" conv=notrunc status=none
+        dd if="$UBOOTIMG" of="$RAW_BOOT_IMG" bs=512 seek="$((UBOOTOFFSET))" conv=notrunc status=none
+        ln -s "$(basename "$RAW_BOOT_IMG")" "$RAW_BOOT_IMG_LATEST"
+    else
+        echo "W: $0: Cannot make raw boot image, one or more boot binaries missing in $dir" >&2
+    fi
 
     # Config files: N/A
     # > $PKG/DEBIAN/conffiles

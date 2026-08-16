@@ -63,7 +63,11 @@ bsp_version=$2
     fi
 
 # PERLE - comment out below for debugging: optee, ti-uboot, etc will build if source is left around
-    rm -rf bsp_sources
+    if [[ "${KEEP_BSP_SOURCES,,}" =~ ^(1|true|yes|y)$ ]]; then
+        log "> Keeping bsp_sources (KEEP_BSP_SOURCES=${KEEP_BSP_SOURCES})"
+    else
+        rm -rf bsp_sources
+    fi
 
     cd ${topdir}/build/
 

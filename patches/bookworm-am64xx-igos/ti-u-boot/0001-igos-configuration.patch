@@ -10,7 +10,7 @@ index 4beef8cdb33..05c49f92700 100644
 +			      k3-am642-evm-nand.dtbo \
 +			      k3-am642-igos.dtb \
 +			      k3-am642-r5-igos.dtb
-
+ 
  dtb-$(CONFIG_SOC_K3_AM625) += k3-am625-sk.dtb \
  			      k3-am625-r5-sk.dtb \
 diff --git a/arch/arm/dts/k3-am642-igos-u-boot.dtsi b/arch/arm/dts/k3-am642-igos-u-boot.dtsi
@@ -276,10 +276,10 @@ index 00000000000..c79ab061814
 +};
 diff --git a/arch/arm/dts/k3-am642-igos.dts b/arch/arm/dts/k3-am642-igos.dts
 new file mode 100644
-index 00000000000..3a9ba880b78
+index 00000000000..62a0eab72c8
 --- /dev/null
 +++ b/arch/arm/dts/k3-am642-igos.dts
-@@ -0,0 +1,611 @@
+@@ -0,0 +1,612 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Copyright (C) 2020-2021 Texas Instruments Incorporated - https://www.ti.com/
@@ -585,9 +585,10 @@ index 00000000000..3a9ba880b78
 +	clock-frequency = <400000>;
 +
 +	eeprom@50 {
-+		/* AT24CM01 */
-+		compatible = "atmel,24c1024";
++		/* AT24C04D */
++		compatible = "atmel,24c04";
 +		reg = <0x50>;
++		pagesize = <16>;
 +		vcc-supply = <&reg_3v3>;
 +	};
 +
@@ -2424,10 +2425,10 @@ index 00000000000..f1f7c68d504
 +
 diff --git a/board/perle/igos/igos.c b/board/perle/igos/igos.c
 new file mode 100644
-index 00000000000..50c89e9e899
+index 00000000000..cf7415f432e
 --- /dev/null
 +++ b/board/perle/igos/igos.c
-@@ -0,0 +1,393 @@
+@@ -0,0 +1,452 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Board specific initialization for AM642 EVM
@@ -2450,53 +2451,42 @@ index 00000000000..50c89e9e899
 +#include <env.h>
 +#include <dm.h>
 +#include <i2c.h>
-+#include <net.h>
 +#include <string.h>
++#include <fs.h>  /* Required for fs_set_blk_dev and fs_write */
 +#include "../common/k3-ddr-init.h"
-+
-+#define AT24C04_BUF_SIZE		512		/* 4K bit = 512 bytes */
-+#define PERLE_AM6_KEY_LEN		16
-+#define PERLE_AM6_VALUE_LEN		32
-+#define MAX_EEPROM_RECORDS		16
-+#define ETH_ADDR_LEN			6
 +
 +#define DEFAULT_PROD_ID			"igos"
 +#define DEFAULT_MODEL_ID		"1000"
-+#define ENV_PREFIX				"board"
 +
-+#define IGOS_EEPROM_KEYS \
-+	X(EE_MFG_ID,   "mfg_id")   \
-+	X(EE_HW_VER,   "hw_ver")   \
-+	X(EE_SW_VER,   "sw_ver")   \
-+	X(EE_PROD_ID,  "prod_id")  \
-+	X(EE_MODEL,    "model")    \
-+	X(EE_MAC,      "mac")      \
-+	X(EE_SERIAL,   "serial")   \
-+	X(EE_SSID,     "ssid")     \
-+	X(EE_PASSWORD, "password")
++#define PERLE_EEP_HDR_MAGIC		__builtin_bswap32(0x50534C00)		/* PSL\0 */
 +
-+enum igos_eeprom_index {
-+#define X(enum_name, str) enum_name,
-+	IGOS_EEPROM_KEYS
-+#undef X
-+	NUM_IGOS_KEYS /* This automatically becomes the total count (8) */
-+};
++#define PERLE_SERIAL_LEN		16
++#define PERLE_PROD_ID_LEN		16
++#define PERLE_MODEL_LEN			16
++#define PERLE_SSID_LEN			16
++#define PERLE_PASSWORD_LEN		16
++#define PERLE_MAC_ADDR_LEN		6
 +
-+static const char * const igos_keys[] = {
-+#define X(enum_name, str) str,
-+	IGOS_EEPROM_KEYS
-+#undef X
-+};
++#define PERLE_WIFI_MAC_ADDR_CNT	2
++#define PERLE_ETH_MAC_ADDR_CNT	9
 +
-+struct perle_am6_eeprom_record_board_info {
-+	char key[PERLE_AM6_KEY_LEN];
-+	char value[PERLE_AM6_VALUE_LEN];
++struct perle_am_eeprom {
++	uint32_t magic;
++	uint16_t version;
++	uint8_t reserved1[10];
++	char serial[PERLE_SERIAL_LEN];
++	char prod_id[PERLE_PROD_ID_LEN];
++	char model[PERLE_MODEL_LEN];
++	char ssid[PERLE_SSID_LEN];
++	char password[PERLE_PASSWORD_LEN];
++	uint8_t reserved2[0x5e];
++	uint8_t wifi_mac_addr[PERLE_WIFI_MAC_ADDR_CNT][PERLE_MAC_ADDR_LEN];
++	uint8_t eth_mac_addr[PERLE_ETH_MAC_ADDR_CNT][PERLE_MAC_ADDR_LEN];
 +} __attribute__ ((__packed__));
 +
 +/* Memory location to keep a copy of the AM6 board info record */
-+#define PERLE_AM6_EEPROM_BD_INFO_DATA ((struct perle_am6_eeprom_record_board_info *) \
++#define PERLE_AM6_EEPROM_BD_INFO_DATA ((struct perle_am_eeprom *) \
 +					     TI_SRAM_SCRATCH_BOARD_EEPROM_START)
-+static int eeprom_kv_count = 0;
 +
 +DECLARE_GLOBAL_DATA_PTR;
 +
@@ -2553,187 +2543,177 @@ index 00000000000..50c89e9e899
 +#endif
 +
 +#ifdef CONFIG_PERLE_I2C_BOARD_DETECT
-+static void dump_eeprom_kv(void)
++static void dump_eeprom(void)
 +{
-+	int i;
-+	struct perle_am6_eeprom_record_board_info *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
 +
-+	if (eeprom_kv_count > 0) {
-+		printf("== EEPROM Key Value. Total (%d) data available. ==\n", eeprom_kv_count);
-+		for (i = 0; i < eeprom_kv_count; i++) {
-+			printf("[%d] %-16s : %-32s\n", i, ep[i].key, ep[i].value);
++	if (ep->magic == PERLE_EEP_HDR_MAGIC) {
++		int i;
++
++		printf("== EEPROM data ====================================\n");
++		printf("MAGIC        : 0x%08X\n", ep->magic);
++		printf("VERSION      : 0x%04X\n", ep->version);
++		printf("SERIAL       : %.*s\n", PERLE_SERIAL_LEN, ep->serial);
++		printf("PROD_ID      : %.*s\n", PERLE_PROD_ID_LEN, ep->prod_id);
++		printf("MODEL        : %.*s\n", PERLE_MODEL_LEN, ep->model);
++		printf("SSID         : %.*s\n", PERLE_SSID_LEN, ep->ssid);
++		printf("PASSWORD     : %.*s\n", PERLE_PASSWORD_LEN, ep->password);
++		for (i = 0; i < PERLE_WIFI_MAC_ADDR_CNT; i++) {
++			if (is_valid_ethaddr(ep->wifi_mac_addr[i])) {
++				printf("WIFI_MAC[%d]  : %pM\n", i, ep->wifi_mac_addr[i]);
++			} else {
++				printf("WIFI_MAC[%d]  : %pM (## Invalid Mac Addr)\n", i, ep->wifi_mac_addr[i]);
++			}
++		}
++		for (i = 0; i < PERLE_ETH_MAC_ADDR_CNT; i++) {
++			if (is_valid_ethaddr(ep->eth_mac_addr[i])) {
++				printf("ETH_MAC[%d]   : %pM\n", i, ep->eth_mac_addr[i]);
++			} else {
++				printf("ETH_MAC[%d]   : %pM (## Invalid Mac Addr)\n", i, ep->eth_mac_addr[i]);
++			}
 +		}
 +		printf("===================================================\n");
 +	} else {
-+		printf("eeprom_kv_count (%d) is not valid!\n", eeprom_kv_count);
++		printf("ERROR: ## EEPROM data is not valid!\n");
 +	}
 +}
-+
-+static int is_key_predefined(const char *key, int *found_idx)
-+{
-+	for (int i = 0; i < NUM_IGOS_KEYS; i++) {
-+		if (strcmp(igos_keys[i], key) == 0) {
-+			if (found_idx)
-+				*found_idx = i;
-+			return 1; /* Key is valid */
-+		}
-+	}
-+	return 0; /* Key is invalid/unexpected */
-+}
-+
-+const char *get_eeprom_key_by_index(int index)
-+{
-+	struct perle_am6_eeprom_record_board_info *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
-+
-+	if (index >= eeprom_kv_count)
-+		return NULL;
-+
-+	return ep[index].key;
-+}
-+
-+const char *get_eeprom_value_by_index(int index)
-+{
-+	struct perle_am6_eeprom_record_board_info *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
-+
-+	if (index >= eeprom_kv_count)
-+		return NULL;
-+
-+	return ep[index].value;
-+}
-+
-+/* Parses the entire buffer into the key-value array once */
-+static void parse_eeprom_to_kv(char *buf)
-+{
-+	char *line;
-+	char *line_ptr = buf;
-+	struct perle_am6_eeprom_record_board_info *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
-+	int index;
-+
-+	for (int i = 0; i < NUM_IGOS_KEYS; i++) {
-+		strncpy(ep[i].key, igos_keys[i], sizeof(ep[0].key) - 1);
-+		ep[i].key[sizeof(ep[0].key) - 1] = '\0';
-+		ep[i].value[0] = '\0';
-+	}
-+	eeprom_kv_count = NUM_IGOS_KEYS;
-+
-+	while ((line = strsep(&line_ptr, "\r\n")) != NULL) {
-+		/* Skip empty lines caused by consecutive \r\n characters */
-+		if (*line == '\0')
-+			continue;
-+
-+		char *key_ptr = line;
-+		char *key = strsep(&key_ptr, "=");
-+		char *val = strsep(&key_ptr, "=");
-+
-+		if (key && val && *key != '\0' && *val != '\0') {
-+			if (is_key_predefined(key, &index)) {
-+				strncpy(ep[index].value, val, sizeof(ep[0].value) - 1);
-+				ep[index].value[sizeof(ep[0].value) - 1] = '\0';
-+			} else {
-+				printf("WARNING: EEPROM KEY(%s) is not pre-defined..\n", key);
-+				if (eeprom_kv_count >= MAX_EEPROM_RECORDS) {
-+					printf("WARNING: kv count (%d) is bigger than max records (%d) Discard this info (%s : %s)\n",
-+						eeprom_kv_count, MAX_EEPROM_RECORDS, key, val);
-+					continue;
-+				}
-+				strncpy(ep[eeprom_kv_count].key, key, sizeof(ep[0].key) - 1);
-+				ep[eeprom_kv_count].key[sizeof(ep[0].key) - 1] = '\0';
-+				strncpy(ep[eeprom_kv_count].value, val, sizeof(ep[0].value) - 1);
-+				ep[eeprom_kv_count].value[sizeof(ep[0].value) - 1] = '\0';
-+				eeprom_kv_count++;
-+			}
-+		}
-+	}
-+	if (is_key_predefined("EE_PROD_ID", &index)) {
-+		if (ep[index].value[0] == '\0') {
-+			printf("INFO: EE_PROD_ID not found in EEPROM. Setting default: %s\n", DEFAULT_PROD_ID);
-+			strncpy(ep[index].value, DEFAULT_PROD_ID, sizeof(ep[0].value) - 1);
-+			ep[index].value[sizeof(ep[0].value) - 1] = '\0';
-+		}
-+	}
-+	if (is_key_predefined("EE_MODEL", &index)) {
-+		if (ep[index].value[0] == '\0') {
-+			printf("INFO: EE_MODEL not found in EEPROM. Setting default: %s\n", DEFAULT_MODEL_ID);
-+			strncpy(ep[index].value, DEFAULT_MODEL_ID, sizeof(ep[0].value) - 1);
-+			ep[index].value[sizeof(ep[0].value) - 1] = '\0';
-+		}
-+	}
-+}
-+
-+#ifdef CONFIG_BOARD_LATE_INIT
-+static int set_env_mac_addr(const char *mac_str)
-+{
-+	u8 mac_addr[ETH_ADDR_LEN];
-+
-+	if (!mac_str) {
-+		printf("Error: mac string is NULL\n");
-+		return -1;
-+	}
-+
-+	string_to_enetaddr(mac_str, mac_addr);
-+	if (is_valid_ethaddr(mac_addr)) {
-+		eth_env_set_enetaddr_by_index("eth", 0, mac_addr);
-+	} else {
-+		printf("Invalid mac address (%s) = converted (%pM)\n", mac_str, mac_addr);
-+	}
-+
-+	return 0;
-+}
-+
-+static int set_env_value(const char *key, const char *value)
-+{
-+	char envkey[PERLE_AM6_KEY_LEN + sizeof(ENV_PREFIX)];
-+
-+	if (!key || !value) {
-+		printf("%s: Invalid key(%s) and/or value(%s)\n", __func__, key, value);
-+		return -1;
-+	}
-+	snprintf(envkey, sizeof(envkey), "%s_%s", ENV_PREFIX, key);
-+	env_set(envkey, value);
-+	return 0;
-+}
-+#endif
 +
 +int do_board_detect(void)
 +{
-+	int rc;
-+	uint8_t eep_buf[AT24C04_BUF_SIZE];
-+	struct udevice *dev;
-+	struct udevice *bus;
++	int rc = 0;
++	int bus_addr, dev_addr;
++	u32 header, size;
++	uint8_t offset_test;
++	bool one_byte_addressing = true;
++	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
 +
-+	if (eeprom_kv_count > 0) {
++	bus_addr = CONFIG_EEPROM_BUS_ADDRESS;
++	dev_addr = CONFIG_EEPROM_CHIP_ADDRESS;
++	header = PERLE_EEP_HDR_MAGIC;
++	size = sizeof(*ep);
++
++	if (ep->magic == header) {
 +		debug("%s: EEPROM has already been read\n", __func__);
 +		return 0;
 +	}
 +
-+	#if CONFIG_IS_ENABLED(DM_I2C)
-+	rc = uclass_get_device_by_seq(UCLASS_I2C, CONFIG_EEPROM_BUS_ADDRESS, &bus);
++#if CONFIG_IS_ENABLED(DM_I2C)
++	struct udevice *dev;
++	struct udevice *bus;
++
++	rc = uclass_get_device_by_seq(UCLASS_I2C, bus_addr, &bus);
 +	if (rc)
 +		return rc;
-+	rc = dm_i2c_probe(bus, CONFIG_EEPROM_CHIP_ADDRESS, 0, &dev);
++	rc = dm_i2c_probe(bus, dev_addr, 0, &dev);
 +	if (rc)
 +		return rc;
 +
-+	rc = dm_i2c_read(dev, 0, eep_buf, sizeof(eep_buf) - 1);
-+	if (rc) {
-+		pr_err("Reading on-board EEPROM at i2c%d - 0x%02x failed %d\n",
-+			       CONFIG_EEPROM_BUS_ADDRESS, CONFIG_EEPROM_CHIP_ADDRESS, rc);
++	/*
++	 * Try 1-byte addressing first
++	 */
++	rc = i2c_set_chip_offset_len(dev, 1);
++	if (rc)
 +		return rc;
++
++	/*
++	 * Skip checking result here since this could be a valid i2c read fail
++	 * on some boards that use 2 byte addressing.
++	 * We must allow for fall through to check the data if 2 byte
++	 * addressing works
++	 */
++	(void)dm_i2c_read(dev, 0, (uint8_t *)ep, size);
++	if (ep->magic != header) {
++		printf("WARNING: Magic from EEPROM %08X. Expected %08X\n", ep->magic, header);
++		one_byte_addressing = false;
 +	}
-+	#endif
-+	eep_buf[sizeof(eep_buf) - 1] = '\0';
 +
-+	parse_eeprom_to_kv(eep_buf);
-+	dump_eeprom_kv();
++	/*
++	 * Handle case of bad 2 byte eeproms that responds to 1 byte addressing
++	 * but gets stuck in const addressing when read requests are performed
++	 * on offsets. We perform an offset test to make sure it is not a 2 byte
++	 * eeprom that works with 1 byte addressing but just without an offset
++	 */
++
++	rc = dm_i2c_read(dev, 0x1, &offset_test, sizeof(offset_test));
++	if (rc || offset_test != ((uint8_t *)&header)[1])
++		one_byte_addressing = false;
++
++	/* Corrupted data??? */
++	if (!one_byte_addressing) {
++		/*
++		 * read the eeprom header using i2c again, but use only a
++		 * 2 byte address (some newer boards need this..)
++		 */
++		rc = i2c_set_chip_offset_len(dev, 2);
++		if (rc)
++			return rc;
++
++		rc = dm_i2c_read(dev, 0, (uint8_t *)ep, size);
++		if (rc)
++			return rc;
++	}
++	if (*((u32 *)ep) != header)
++		return -1;
++#else
++	u32 byte;
++
++	gpi2c_init();
++	rc = ti_i2c_eeprom_init(bus_addr, dev_addr);
++	if (rc)
++		return rc;
++
++	/*
++	 * Read the header first then only read the other contents.
++	 */
++	byte = 1;
++
++	/*
++	 * Skip checking result here since this could be a valid i2c read fail
++	 * on some boards that use 2 byte addressing.
++	 * We must allow for fall through to check the data if 2 byte
++	 * addressing works
++	 */
++	(void)i2c_read(dev_addr, 0x0, byte, (uint8_t *)ep, size);
++	if (ep->magic != header)
++		one_byte_addressing = false;
++
++	/*
++	 * Handle case of bad 2 byte eeproms that responds to 1 byte addressing
++	 * but gets stuck in const addressing when read requests are performed
++	 * on offsets. We perform an offset test to make sure it is not a 2 byte
++	 * eeprom that works with 1 byte addressing but just without an offset
++	 */
++
++	rc = i2c_read(dev_addr, 0x1, byte, &offset_test, sizeof(offset_test));
++	if (rc || offset_test != ((uint8_t *)&header)[1])
++		one_byte_addressing = false;
++
++	/* Corrupted data??? */
++	if (!one_byte_addressing) {
++		/*
++		 * read the eeprom header using i2c again, but use only a
++		 * 2 byte address (some newer boards need this..)
++		 */
++		byte = 2;
++		rc = i2c_read(dev_addr, 0x0, byte, (uint8_t *)ep, size);
++		if (rc)
++			return rc;
++	}
++	if (ep->magic != header)
++		return -1;
++#endif
++
++	dump_eeprom();
 +
 +	return rc;
 +}
 +
 +int checkboard(void)
 +{
++	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++
 +	if (!do_board_detect()) {
-+		printf("Model: %s-%s, hw-ver %s, sw-ver %s\n", get_eeprom_value_by_index(EE_PROD_ID),
-+			get_eeprom_value_by_index(EE_MODEL), get_eeprom_value_by_index(EE_HW_VER), get_eeprom_value_by_index(EE_SW_VER));
++		printf("Ver %x, Model: %s-%s\n", ep->version, ep->prod_id, ep->model);
 +	}
 +
 +	return 0;
@@ -2743,36 +2723,129 @@ index 00000000000..50c89e9e899
 +static void setup_board_eeprom_env(void)
 +{
 +	char board_name[128];
++	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
 +
 +	if (do_board_detect()) {
++		env_set("prod_id", DEFAULT_PROD_ID);
++		env_set("model", DEFAULT_MODEL_ID);
 +		snprintf(board_name, sizeof(board_name), "%s-%s", DEFAULT_PROD_ID, DEFAULT_MODEL_ID);
 +	} else {
-+		snprintf(board_name, sizeof(board_name), "%s-%s", get_eeprom_value_by_index(EE_PROD_ID), get_eeprom_value_by_index(EE_MODEL));
++		env_set("prod_id", ep->prod_id);
++		env_set("model", ep->model);
++		snprintf(board_name, sizeof(board_name), "%s-%s", ep->prod_id, ep->model);
 +	}
 +	env_set("board_name", board_name);
 +}
 +
-+#if 0
 +static void setup_serial(void)
 +{
-+	struct ti_am6_eeprom *ep = TI_AM6_EEPROM_DATA;
-+	unsigned long board_serial;
-+	char *endp;
-+	char serial_string[17] = { 0 };
++	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
 +
-+	if (env_get("serial#"))
-+		return;
-+
-+	board_serial = hextoul(ep->serial, &endp);
-+	if (*endp != '\0') {
-+		pr_err("Error: Can't set serial# to %s\n", ep->serial);
-+		return;
-+	}
-+
-+	snprintf(serial_string, sizeof(serial_string), "%016lx", board_serial);
-+	env_set("serial#", serial_string);
++	env_set("serial#", ep->serial);
 +}
-+#endif
++
++static void set_env_mac_addr(void)
++{
++	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++
++	if (!do_board_detect()) {
++		int i;
++
++		for (i = 0; i < PERLE_WIFI_MAC_ADDR_CNT; i++) {
++			if (is_valid_ethaddr(ep->wifi_mac_addr[i])) {
++				eth_env_set_enetaddr_by_index("wifi", i, ep->wifi_mac_addr[i]);
++			} else {
++				debug("Invalid wifi mac%d address (%pM)\n", i, ep->wifi_mac_addr[i]);
++			}
++		}
++		for (i = 0; i < PERLE_ETH_MAC_ADDR_CNT; i++) {
++			if (is_valid_ethaddr(ep->eth_mac_addr[i])) {
++				eth_env_set_enetaddr_by_index("eth", i, ep->eth_mac_addr[i]);
++			} else {
++				debug("Invalid eth mac%d address (%pM)\n", i, ep->eth_mac_addr[i]);
++			}
++		}
++	}
++}
++
++/**
++ * generate_product_env_buf() - Build key=value text buffer from EEPROM data
++ * @buf: Target buffer to hold env file contents
++ * @buf_size: Size of target buffer
++ *
++ * Return: Length of generated buffer on success, or negative on error
++ */
++static int generate_product_env_buf(char *buf, size_t buf_size)
++{
++    struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++    int len = 0;
++    int i;
++
++    /* Ensure EEPROM data is valid */
++    if (do_board_detect() != 0) {
++        pr_err("Error: Failed to read EEPROM for PRODUCT.ENV creation\n");
++        return -1;
++    }
++
++    /* Standard product fields */
++    len += snprintf(buf + len, buf_size - len, "version=%04x\n", ep->version);
++    len += snprintf(buf + len, buf_size - len, "serial=%.*s\n", PERLE_SERIAL_LEN, ep->serial);
++    len += snprintf(buf + len, buf_size - len, "prod_id=%.*s\n", PERLE_PROD_ID_LEN, ep->prod_id);
++    len += snprintf(buf + len, buf_size - len, "model=%.*s\n", PERLE_MODEL_LEN, ep->model);
++    len += snprintf(buf + len, buf_size - len, "ssid=%.*s\n", PERLE_SSID_LEN, ep->ssid);
++    len += snprintf(buf + len, buf_size - len, "password=%.*s\n", PERLE_PASSWORD_LEN, ep->password);
++
++    /* Wi-Fi MAC Addresses */
++    for (i = 0; i < PERLE_WIFI_MAC_ADDR_CNT; i++) {
++        len += snprintf(buf + len, buf_size - len, "wifi_mac%d=%pM\n",
++                        i, ep->wifi_mac_addr[i]);
++    }
++
++    /* Ethernet MAC Addresses */
++    for (i = 0; i < PERLE_ETH_MAC_ADDR_CNT; i++) {
++        len += snprintf(buf + len, buf_size - len, "eth_mac%d=%pM\n",
++                        i, ep->eth_mac_addr[i]);
++    }
++
++    return len;
++}
++
++/**
++ * write_product_env_file() - Save PRODUCT.ENV file to a storage filesystem
++ * @ifname: Interface type (e.g., "mmc")
++ * @dev_part: Device and partition string (e.g., "1:1" or "0:1")
++ * @filepath: Target filename (e.g., "PRODUCT.ENV" or "/boot/PRODUCT.ENV")
++ */
++int write_product_env_file(const char *ifname, const char *dev_part, const char *filepath)
++{
++    char env_buffer[2048] = { 0 };
++    loff_t actwrite;
++    int len;
++    int ret;
++
++    len = generate_product_env_buf(env_buffer, sizeof(env_buffer));
++    if (len <= 0)
++        return -1;
++
++    /* Bind filesystem handler (FAT, EXT4, etc.) */
++    ret = fs_set_blk_dev(ifname, dev_part, FS_TYPE_ANY);
++    if (ret) {
++        pr_err("PRODUCT.ENV: Failed to set device %s %s\n", ifname, dev_part);
++        return ret;
++    }
++
++    /* Write buffer to file */
++    ret = fs_write(filepath, (ulong)env_buffer, 0, len, &actwrite);
++    if (ret) {
++        pr_err("PRODUCT.ENV: Failed to write file %s\n", filepath);
++        return ret;
++    }
++
++    printf("PRODUCT.ENV: Successfully wrote %lld bytes to %s:%s/%s\n",
++           actwrite, ifname, dev_part, filepath);
++
++    return 0;
++}
 +#endif
 +#endif
 +
@@ -2780,25 +2853,12 @@ index 00000000000..50c89e9e899
 +int board_late_init(void)
 +{
 +	if (IS_ENABLED(CONFIG_PERLE_I2C_BOARD_DETECT)) {
-+		int i;
-+		const char *key, *value;
-+
 +		setup_board_eeprom_env();
-+		//setup_serial();
++		setup_serial();
++		set_env_mac_addr();
 +
-+		for (i = 0; i < eeprom_kv_count; i++) {
-+			key = get_eeprom_key_by_index(i);
-+			value = get_eeprom_value_by_index(i);
-+			if (key && value && *key != '\0' && *value != '\0') {
-+				if (i == EE_MAC) {
-+					set_env_mac_addr(value);
-+				} else {
-+					set_env_value(key, value);
-+				}
-+			} else {
-+				printf("Invalid EEPROM parsed data. Key (%s), Value(%s)\n", key, value);
-+			}
-+		}
++		/* Write PRODUCT.ENV to eMMC partition 0:2 */
++		write_product_env_file("mmc", "0:2", "PRODUCT.ENV");
 +	}
 +
 +	return 0;
@@ -2823,7 +2883,7 @@ index 00000000000..50c89e9e899
 +#endif
 diff --git a/board/perle/igos/igos.env b/board/perle/igos/igos.env
 new file mode 100644
-index 00000000000..a21297ff9f4
+index 00000000000..1f48d4501a0
 --- /dev/null
 +++ b/board/perle/igos/igos.env
 @@ -0,0 +1,59 @@
@@ -4867,7 +4927,7 @@ index 00000000000..bd7d3745ade
 +-----END RSA PRIVATE KEY-----
 diff --git a/configs/am64x_igos_a53_defconfig b/configs/am64x_igos_a53_defconfig
 new file mode 100644
-index 00000000000..bba14e8b46e
+index 00000000000..d0c9169a1c4
 --- /dev/null
 +++ b/configs/am64x_igos_a53_defconfig
 @@ -0,0 +1,2309 @@

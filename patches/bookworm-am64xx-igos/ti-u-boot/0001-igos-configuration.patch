@@ -276,7 +276,7 @@ index 00000000000..c79ab061814
 +};
 diff --git a/arch/arm/dts/k3-am642-igos.dts b/arch/arm/dts/k3-am642-igos.dts
 new file mode 100644
-index 00000000000..62a0eab72c8
+index 00000000000..13d371b17de
 --- /dev/null
 +++ b/arch/arm/dts/k3-am642-igos.dts
 @@ -0,0 +1,612 @@
@@ -400,8 +400,8 @@ index 00000000000..62a0eab72c8
 +
 +	main_uart3_pins_default: main-uart3-pins-default {
 +		pinctrl-single,pins = <
-+ 			AM64X_IOPAD(0x0188, PIN_INPUT_PULLUP, 10)   /* (AA5) UART3_RXD */
-+ 			AM64X_IOPAD(0x0170, PIN_OUTPUT, 10)         /* (AA2) UART3_TXD */
++			AM64X_IOPAD(0x0188, PIN_INPUT_PULLUP, 10)   /* (AA5) UART3_RXD */
++			AM64X_IOPAD(0x0170, PIN_OUTPUT, 10)         /* (AA2) UART3_TXD */
 +		>;
 +	};
 +
@@ -894,7 +894,7 @@ index 00000000000..62a0eab72c8
 +};
 diff --git a/arch/arm/dts/k3-am642-r5-igos.dts b/arch/arm/dts/k3-am642-r5-igos.dts
 new file mode 100644
-index 00000000000..453d63d29ef
+index 00000000000..d619442c989
 --- /dev/null
 +++ b/arch/arm/dts/k3-am642-r5-igos.dts
 @@ -0,0 +1,312 @@
@@ -1029,8 +1029,8 @@ index 00000000000..453d63d29ef
 +	main_uart3_pins_default: main-uart3-pins-default {
 +		bootph-pre-ram;
 +		pinctrl-single,pins = <
-+ 			AM64X_IOPAD(0x0188, PIN_INPUT, 10)		/* (AA5) UART3_RXD */
-+ 			AM64X_IOPAD(0x0170, PIN_OUTPUT, 10)		/* (AA2) UART3_TXD */
++			AM64X_IOPAD(0x0188, PIN_INPUT, 10)		/* (AA5) UART3_RXD */
++			AM64X_IOPAD(0x0170, PIN_OUTPUT, 10)		/* (AA2) UART3_TXD */
 +		>;
 +	};
 +
@@ -2382,10 +2382,10 @@ index 00000000000..7431a8c1e3a
 +obj-y	+= igos.o
 diff --git a/board/perle/igos/board-cfg.yaml b/board/perle/igos/board-cfg.yaml
 new file mode 100644
-index 00000000000..f1f7c68d504
+index 00000000000..36ac5361c78
 --- /dev/null
 +++ b/board/perle/igos/board-cfg.yaml
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,36 @@
 +# SPDX-License-Identifier: GPL-2.0+
 +# Copyright (C) 2022 Texas Instruments Incorporated - https://www.ti.com/
 +#
@@ -2422,13 +2422,12 @@ index 00000000000..f1f7c68d504
 +                        size: 8
 +                trace_dst_enables : 0x00
 +                trace_src_enables : 0x00
-+
 diff --git a/board/perle/igos/igos.c b/board/perle/igos/igos.c
 new file mode 100644
-index 00000000000..cf7415f432e
+index 00000000000..b6f5febbc5d
 --- /dev/null
 +++ b/board/perle/igos/igos.c
-@@ -0,0 +1,452 @@
+@@ -0,0 +1,456 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Board specific initialization for AM642 EVM
@@ -2455,31 +2454,35 @@ index 00000000000..cf7415f432e
 +#include <fs.h>  /* Required for fs_set_blk_dev and fs_write */
 +#include "../common/k3-ddr-init.h"
 +
-+#define DEFAULT_PROD_ID			"igos"
++#define DEFAULT_PROD_ID		"igos"
 +#define DEFAULT_MODEL_ID		"1000"
 +
 +#define PERLE_EEP_HDR_MAGIC		__builtin_bswap32(0x50534C00)		/* PSL\0 */
 +
 +#define PERLE_SERIAL_LEN		16
++#define PERLE_VENDOR_LEN		16
++#define PERLE_UUID_LEN			16
 +#define PERLE_PROD_ID_LEN		16
-+#define PERLE_MODEL_LEN			16
++#define PERLE_MODEL_LEN		16
 +#define PERLE_SSID_LEN			16
 +#define PERLE_PASSWORD_LEN		16
 +#define PERLE_MAC_ADDR_LEN		6
 +
-+#define PERLE_WIFI_MAC_ADDR_CNT	2
-+#define PERLE_ETH_MAC_ADDR_CNT	9
++#define PERLE_WIFI_MAC_ADDR_CNT	4
++#define PERLE_ETH_MAC_ADDR_CNT	    9
 +
 +struct perle_am_eeprom {
 +	uint32_t magic;
 +	uint16_t version;
 +	uint8_t reserved1[10];
++	char vendor[PERLE_VENDOR_LEN];
 +	char serial[PERLE_SERIAL_LEN];
++	uint8_t uuid[PERLE_UUID_LEN];
 +	char prod_id[PERLE_PROD_ID_LEN];
 +	char model[PERLE_MODEL_LEN];
 +	char ssid[PERLE_SSID_LEN];
 +	char password[PERLE_PASSWORD_LEN];
-+	uint8_t reserved2[0x5e];
++	uint8_t reserved2[50];
 +	uint8_t wifi_mac_addr[PERLE_WIFI_MAC_ADDR_CNT][PERLE_MAC_ADDR_LEN];
 +	uint8_t eth_mac_addr[PERLE_ETH_MAC_ADDR_CNT][PERLE_MAC_ADDR_LEN];
 +} __attribute__ ((__packed__));

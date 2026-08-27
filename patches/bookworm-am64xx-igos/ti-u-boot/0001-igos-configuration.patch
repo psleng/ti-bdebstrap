@@ -276,10 +276,10 @@ index 00000000000..c79ab061814
 +};
 diff --git a/arch/arm/dts/k3-am642-igos.dts b/arch/arm/dts/k3-am642-igos.dts
 new file mode 100644
-index 00000000000..62a0eab72c8
+index 00000000000..65134e780f3
 --- /dev/null
 +++ b/arch/arm/dts/k3-am642-igos.dts
-@@ -0,0 +1,612 @@
+@@ -0,0 +1,613 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Copyright (C) 2020-2021 Texas Instruments Incorporated - https://www.ti.com/
@@ -804,6 +804,7 @@ index 00000000000..62a0eab72c8
 +		/* ti,max-output-impedance; */
 +		ti,clk-output-sel = <DP83867_CLK_O_SEL_OFF>;
 +		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
++		ti,tx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
 +		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_4_B_NIB>;
 +	};
 +};
@@ -2425,10 +2426,10 @@ index 00000000000..f1f7c68d504
 +
 diff --git a/board/perle/igos/igos.c b/board/perle/igos/igos.c
 new file mode 100644
-index 00000000000..cf7415f432e
+index 00000000000..86c0bc3d072
 --- /dev/null
 +++ b/board/perle/igos/igos.c
-@@ -0,0 +1,452 @@
+@@ -0,0 +1,646 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Board specific initialization for AM642 EVM
@@ -2452,43 +2453,134 @@ index 00000000000..cf7415f432e
 +#include <dm.h>
 +#include <i2c.h>
 +#include <string.h>
++#include <malloc.h>
 +#include <fs.h>  /* Required for fs_set_blk_dev and fs_write */
 +#include "../common/k3-ddr-init.h"
++
++DECLARE_GLOBAL_DATA_PTR;
 +
 +#define DEFAULT_PROD_ID			"igos"
 +#define DEFAULT_MODEL_ID		"1000"
 +
 +#define PERLE_EEP_HDR_MAGIC		__builtin_bswap32(0x50534C00)		/* PSL\0 */
 +
++#define PERLE_VENDOR_LEN		16
 +#define PERLE_SERIAL_LEN		16
++#define PERLE_UUID_LEN			16
 +#define PERLE_PROD_ID_LEN		16
 +#define PERLE_MODEL_LEN			16
 +#define PERLE_SSID_LEN			16
 +#define PERLE_PASSWORD_LEN		16
 +#define PERLE_MAC_ADDR_LEN		6
 +
-+#define PERLE_WIFI_MAC_ADDR_CNT	2
-+#define PERLE_ETH_MAC_ADDR_CNT	9
++#define PERLE_V1_WIFI_MAC_ADDR_CNT	2
++#define PERLE_V2_WIFI_MAC_ADDR_CNT	4
++#define PERLE_ETH_MAC_ADDR_CNT		9
 +
-+struct perle_am_eeprom {
++/* Common EEPROM Header Structure */
++struct eep_hdr {
 +	uint32_t magic;
 +	uint16_t version;
 +	uint8_t reserved1[10];
++} __attribute__ ((__packed__));
++
++/* Version 1 Payload Layout */
++struct eep_pd_v1 {
 +	char serial[PERLE_SERIAL_LEN];
 +	char prod_id[PERLE_PROD_ID_LEN];
 +	char model[PERLE_MODEL_LEN];
 +	char ssid[PERLE_SSID_LEN];
 +	char password[PERLE_PASSWORD_LEN];
-+	uint8_t reserved2[0x5e];
-+	uint8_t wifi_mac_addr[PERLE_WIFI_MAC_ADDR_CNT][PERLE_MAC_ADDR_LEN];
++	uint8_t reserved2[94];
++	uint8_t wifi_mac_addr[PERLE_V1_WIFI_MAC_ADDR_CNT][PERLE_MAC_ADDR_LEN];
 +	uint8_t eth_mac_addr[PERLE_ETH_MAC_ADDR_CNT][PERLE_MAC_ADDR_LEN];
 +} __attribute__ ((__packed__));
 +
-+/* Memory location to keep a copy of the AM6 board info record */
-+#define PERLE_AM6_EEPROM_BD_INFO_DATA ((struct perle_am_eeprom *) \
-+					     TI_SRAM_SCRATCH_BOARD_EEPROM_START)
++/* Version 2 Payload Layout */
++struct eep_pd_v2 {
++	char vendor[PERLE_VENDOR_LEN];
++	char serial[PERLE_SERIAL_LEN];
++	uint8_t uuid[PERLE_UUID_LEN];
++	char prod_id[PERLE_PROD_ID_LEN];
++	char model[PERLE_MODEL_LEN];
++	char ssid[PERLE_SSID_LEN];
++	char password[PERLE_PASSWORD_LEN];
++	uint8_t reserved2[50];
++	uint8_t wifi_mac_addr[PERLE_V2_WIFI_MAC_ADDR_CNT][PERLE_MAC_ADDR_LEN];
++	uint8_t eth_mac_addr[PERLE_ETH_MAC_ADDR_CNT][PERLE_MAC_ADDR_LEN];
++} __attribute__ ((__packed__));
 +
-+DECLARE_GLOBAL_DATA_PTR;
++/* Master Structure */
++struct perle_am_eep {
++	struct eep_hdr hdr;
++	union {
++		struct eep_pd_v1 v1;
++		struct eep_pd_v2 v2;
++	} payload;
++} __attribute__ ((__packed__));
++
++/* Memory location for SRAM scratchpad EEPROM copy */
++#define PERLE_AM6_EEPROM_BD_INFO_DATA ((struct perle_am_eep *) \
++					TI_SRAM_SCRATCH_BOARD_EEPROM_START)
++
++/* ========================================================================
++ * FIELD DESCRIPTOR SCHEMA ARCHITECTURE
++ * ======================================================================== */
++
++enum eep_field_type {
++	TYPE_STRING,
++	TYPE_UUID,
++	TYPE_MAC_ARRAY
++};
++
++struct eep_field_desc {
++	const char *key_name;		/* Environmental variable / file key */
++	size_t offset;				/* Byte offset inside payload struct */
++	size_t size;				/* Size of string/field (or 1 MAC addr size) */
++	size_t count;				/* Array count (1 for scalars) */
++	enum eep_field_type type;	/* Data formatting strategy */
++};
++
++#define PAYLOAD_OFFSET(struct_type, field) offsetof(struct_type, field)
++
++/* Version 1 Descriptor Schema */
++static const struct eep_field_desc v1_schema[] = {
++	{ "serial",		PAYLOAD_OFFSET(struct eep_pd_v1, serial),   PERLE_SERIAL_LEN, 1, TYPE_STRING },
++	{ "prod_id",	PAYLOAD_OFFSET(struct eep_pd_v1, prod_id),  PERLE_PROD_ID_LEN,1, TYPE_STRING },
++	{ "model",		PAYLOAD_OFFSET(struct eep_pd_v1, model),   PERLE_MODEL_LEN,  1, TYPE_STRING },
++	{ "ssid",		PAYLOAD_OFFSET(struct eep_pd_v1, ssid),    PERLE_SSID_LEN,   1, TYPE_STRING },
++	{ "password",	PAYLOAD_OFFSET(struct eep_pd_v1, password),PERLE_PASSWORD_LEN,1, TYPE_STRING },
++	{ "wifi",		PAYLOAD_OFFSET(struct eep_pd_v1, wifi_mac_addr), PERLE_MAC_ADDR_LEN, PERLE_V1_WIFI_MAC_ADDR_CNT, TYPE_MAC_ARRAY },
++	{ "eth",		PAYLOAD_OFFSET(struct eep_pd_v1, eth_mac_addr),  PERLE_MAC_ADDR_LEN, PERLE_ETH_MAC_ADDR_CNT,  TYPE_MAC_ARRAY },
++};
++
++/* Version 2 Descriptor Schema */
++static const struct eep_field_desc v2_schema[] = {
++	{ "vendor",		PAYLOAD_OFFSET(struct eep_pd_v2, vendor),   PERLE_VENDOR_LEN, 1, TYPE_STRING },
++	{ "serial",		PAYLOAD_OFFSET(struct eep_pd_v2, serial),   PERLE_SERIAL_LEN, 1, TYPE_STRING },
++	{ "uuid",		PAYLOAD_OFFSET(struct eep_pd_v2, uuid),     PERLE_UUID_LEN,   1, TYPE_UUID },
++	{ "prod_id",	PAYLOAD_OFFSET(struct eep_pd_v2, prod_id),  PERLE_PROD_ID_LEN,1, TYPE_STRING },
++	{ "model",		PAYLOAD_OFFSET(struct eep_pd_v2, model),   PERLE_MODEL_LEN,  1, TYPE_STRING },
++	{ "ssid",		PAYLOAD_OFFSET(struct eep_pd_v2, ssid),    PERLE_SSID_LEN,   1, TYPE_STRING },
++	{ "password",	PAYLOAD_OFFSET(struct eep_pd_v2, password),PERLE_PASSWORD_LEN,1, TYPE_STRING },
++	{ "wifi",		PAYLOAD_OFFSET(struct eep_pd_v2, wifi_mac_addr), PERLE_MAC_ADDR_LEN, PERLE_V2_WIFI_MAC_ADDR_CNT, TYPE_MAC_ARRAY },
++	{ "eth",		PAYLOAD_OFFSET(struct eep_pd_v2, eth_mac_addr),  PERLE_MAC_ADDR_LEN, PERLE_ETH_MAC_ADDR_CNT,  TYPE_MAC_ARRAY },
++};
++
++struct eep_ver_entry {
++	const struct eep_field_desc *fields;
++	size_t num_fields;
++};
++
++static const struct eep_ver_entry version_registry[] = {
++	[0x0001] = { v1_schema, ARRAY_SIZE(v1_schema) },
++	[0x0002] = { v2_schema, ARRAY_SIZE(v2_schema) },
++};
++
++static const struct eep_ver_entry *get_version_entry(uint16_t version)
++{
++	return (version < ARRAY_SIZE(version_registry)) ? &version_registry[version] : NULL;
++}
 +
 +int board_init(void)
 +{
@@ -2519,7 +2611,7 @@ index 00000000000..cf7415f432e
 +					   "dr_mode", "host", 5, 0);
 +		if (ret)
 +			printf("%s: fdt_find_and_setprop() failed:%d\n",
-+			       __func__, ret);
++					__func__, ret);
 +		fallthrough;
 +	default:
 +		break;
@@ -2543,33 +2635,55 @@ index 00000000000..cf7415f432e
 +#endif
 +
 +#ifdef CONFIG_PERLE_I2C_BOARD_DETECT
++static size_t strnlen_clean(const char *s, size_t maxlen)
++{
++    size_t len = 0;
++    while (len < maxlen && s[len] != '\0' && s[len] != '\xFF')
++        len++;
++    return len;
++}
++
 +static void dump_eeprom(void)
 +{
-+	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++	struct perle_am_eep *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++	const struct eep_ver_entry *entry = get_version_entry(ep->hdr.version);
++	uint8_t *payload_base = (uint8_t *)&ep->payload;
 +
-+	if (ep->magic == PERLE_EEP_HDR_MAGIC) {
-+		int i;
-+
++	if (ep->hdr.magic == PERLE_EEP_HDR_MAGIC) {
 +		printf("== EEPROM data ====================================\n");
-+		printf("MAGIC        : 0x%08X\n", ep->magic);
-+		printf("VERSION      : 0x%04X\n", ep->version);
-+		printf("SERIAL       : %.*s\n", PERLE_SERIAL_LEN, ep->serial);
-+		printf("PROD_ID      : %.*s\n", PERLE_PROD_ID_LEN, ep->prod_id);
-+		printf("MODEL        : %.*s\n", PERLE_MODEL_LEN, ep->model);
-+		printf("SSID         : %.*s\n", PERLE_SSID_LEN, ep->ssid);
-+		printf("PASSWORD     : %.*s\n", PERLE_PASSWORD_LEN, ep->password);
-+		for (i = 0; i < PERLE_WIFI_MAC_ADDR_CNT; i++) {
-+			if (is_valid_ethaddr(ep->wifi_mac_addr[i])) {
-+				printf("WIFI_MAC[%d]  : %pM\n", i, ep->wifi_mac_addr[i]);
-+			} else {
-+				printf("WIFI_MAC[%d]  : %pM (## Invalid Mac Addr)\n", i, ep->wifi_mac_addr[i]);
-+			}
-+		}
-+		for (i = 0; i < PERLE_ETH_MAC_ADDR_CNT; i++) {
-+			if (is_valid_ethaddr(ep->eth_mac_addr[i])) {
-+				printf("ETH_MAC[%d]   : %pM\n", i, ep->eth_mac_addr[i]);
-+			} else {
-+				printf("ETH_MAC[%d]   : %pM (## Invalid Mac Addr)\n", i, ep->eth_mac_addr[i]);
++		printf("MAGIC        : 0x%08X\n", ep->hdr.magic);
++		printf("VERSION      : 0x%04X\n", ep->hdr.version);
++		if (!entry || !entry->fields) {
++			printf("WARNING: Unsupported EEPROM layout version 0x%04X\n", ep->hdr.version);
++		} else {
++			int i, m;
++			size_t str_len;
++			for (i = 0; i < entry->num_fields; i++) {
++				const struct eep_field_desc *f = &entry->fields[i];
++				uint8_t *ptr = payload_base + f->offset;
++
++				switch (f->type) {
++				case TYPE_STRING:
++					str_len = strnlen_clean((char*)ptr, f->size);
++					printf("%-12s : %.*s\n", f->key_name, (int)str_len, (char *)ptr);
++					break;
++				case TYPE_UUID:
++					printf("%-12s : %02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x\n",
++						   f->key_name,
++						   ptr[0], ptr[1], ptr[2], ptr[3], ptr[4], ptr[5], ptr[6], ptr[7],
++						   ptr[8], ptr[9], ptr[10], ptr[11], ptr[12], ptr[13], ptr[14], ptr[15]);
++					break;
++				case TYPE_MAC_ARRAY:
++					for (m = 0; m < f->count; m++) {
++						uint8_t *mac = ptr + (m * f->size);
++						if (is_valid_ethaddr(mac)) {
++							printf("%s mac[%d]   : %pM\n", f->key_name, m, mac);
++						} else {
++							printf("%s mac[%d]   : %pM (## Invalid Mac Addr)\n", f->key_name, m, mac);
++						}
++					}
++					break;
++				}
 +			}
 +		}
 +		printf("===================================================\n");
@@ -2585,14 +2699,14 @@ index 00000000000..cf7415f432e
 +	u32 header, size;
 +	uint8_t offset_test;
 +	bool one_byte_addressing = true;
-+	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++	struct perle_am_eep *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
 +
 +	bus_addr = CONFIG_EEPROM_BUS_ADDRESS;
 +	dev_addr = CONFIG_EEPROM_CHIP_ADDRESS;
 +	header = PERLE_EEP_HDR_MAGIC;
 +	size = sizeof(*ep);
 +
-+	if (ep->magic == header) {
++	if (ep->hdr.magic == header) {
 +		debug("%s: EEPROM has already been read\n", __func__);
 +		return 0;
 +	}
@@ -2604,13 +2718,12 @@ index 00000000000..cf7415f432e
 +	rc = uclass_get_device_by_seq(UCLASS_I2C, bus_addr, &bus);
 +	if (rc)
 +		return rc;
++
 +	rc = dm_i2c_probe(bus, dev_addr, 0, &dev);
 +	if (rc)
 +		return rc;
 +
-+	/*
-+	 * Try 1-byte addressing first
-+	 */
++	/* Try 1-byte addressing first */
 +	rc = i2c_set_chip_offset_len(dev, 1);
 +	if (rc)
 +		return rc;
@@ -2622,8 +2735,8 @@ index 00000000000..cf7415f432e
 +	 * addressing works
 +	 */
 +	(void)dm_i2c_read(dev, 0, (uint8_t *)ep, size);
-+	if (ep->magic != header) {
-+		printf("WARNING: Magic from EEPROM %08X. Expected %08X\n", ep->magic, header);
++	if (ep->hdr.magic != header) {
++		printf("WARNING: Magic from EEPROM %08X. Expected %08X\n", ep->hdr.magic, header);
 +		one_byte_addressing = false;
 +	}
 +
@@ -2633,7 +2746,6 @@ index 00000000000..cf7415f432e
 +	 * on offsets. We perform an offset test to make sure it is not a 2 byte
 +	 * eeprom that works with 1 byte addressing but just without an offset
 +	 */
-+
 +	rc = dm_i2c_read(dev, 0x1, &offset_test, sizeof(offset_test));
 +	if (rc || offset_test != ((uint8_t *)&header)[1])
 +		one_byte_addressing = false;
@@ -2652,10 +2764,11 @@ index 00000000000..cf7415f432e
 +		if (rc)
 +			return rc;
 +	}
-+	if (*((u32 *)ep) != header)
++
++	if (ep->hdr.magic != header)
 +		return -1;
 +#else
-+	u32 byte;
++	u32 alen = 1;
 +
 +	gpi2c_init();
 +	rc = ti_i2c_eeprom_init(bus_addr, dev_addr);
@@ -2663,18 +2776,13 @@ index 00000000000..cf7415f432e
 +		return rc;
 +
 +	/*
-+	 * Read the header first then only read the other contents.
-+	 */
-+	byte = 1;
-+
-+	/*
 +	 * Skip checking result here since this could be a valid i2c read fail
 +	 * on some boards that use 2 byte addressing.
 +	 * We must allow for fall through to check the data if 2 byte
 +	 * addressing works
 +	 */
-+	(void)i2c_read(dev_addr, 0x0, byte, (uint8_t *)ep, size);
-+	if (ep->magic != header)
++	(void)i2c_read(dev_addr, 0x0, alen, (uint8_t *)ep, size);
++	if (ep->hdr.magic != header)
 +		one_byte_addressing = false;
 +
 +	/*
@@ -2683,8 +2791,7 @@ index 00000000000..cf7415f432e
 +	 * on offsets. We perform an offset test to make sure it is not a 2 byte
 +	 * eeprom that works with 1 byte addressing but just without an offset
 +	 */
-+
-+	rc = i2c_read(dev_addr, 0x1, byte, &offset_test, sizeof(offset_test));
++	rc = i2c_read(dev_addr, 0x1, alen, &offset_test, sizeof(offset_test));
 +	if (rc || offset_test != ((uint8_t *)&header)[1])
 +		one_byte_addressing = false;
 +
@@ -2694,12 +2801,12 @@ index 00000000000..cf7415f432e
 +		 * read the eeprom header using i2c again, but use only a
 +		 * 2 byte address (some newer boards need this..)
 +		 */
-+		byte = 2;
-+		rc = i2c_read(dev_addr, 0x0, byte, (uint8_t *)ep, size);
++		alen = 2;
++		rc = i2c_read(dev_addr, 0x0, alen, (uint8_t *)ep, size);
 +		if (rc)
 +			return rc;
 +	}
-+	if (ep->magic != header)
++	if (ep->hdr.magic != header)
 +		return -1;
 +#endif
 +
@@ -2710,59 +2817,87 @@ index 00000000000..cf7415f432e
 +
 +int checkboard(void)
 +{
-+	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
-+
-+	if (!do_board_detect()) {
-+		printf("Ver %x, Model: %s-%s\n", ep->version, ep->prod_id, ep->model);
-+	}
-+
 +	return 0;
 +}
 +
 +#ifdef CONFIG_BOARD_LATE_INIT
++static const void *get_field_ptr(const char *key, size_t *out_size)
++{
++	struct perle_am_eep *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++	const struct eep_ver_entry *entry = get_version_entry(ep->hdr.version);
++	size_t i;
++
++	if (ep->hdr.magic != PERLE_EEP_HDR_MAGIC || !entry)
++		return NULL;
++
++	for (i = 0; i < entry->num_fields; i++) {
++		if (strcmp(entry->fields[i].key_name, key) == 0) {
++			if (out_size)
++				*out_size = entry->fields[i].size;
++			return ((uint8_t *)&ep->payload) + entry->fields[i].offset;
++		}
++	}
++
++	return NULL;
++}
++
 +static void setup_board_eeprom_env(void)
 +{
 +	char board_name[128];
-+	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++	size_t prod_sz = 0, model_sz = 0;
++	const char *prod = get_field_ptr("prod_id", &prod_sz);
++	const char *model = get_field_ptr("model", &model_sz);
 +
-+	if (do_board_detect()) {
++	char prod_buf[32] = { 0 };
++	char model_buf[32] = { 0 };
++
++	if (prod && model) {
++		snprintf(prod_buf, sizeof(prod_buf), "%.*s", (int)prod_sz, prod);
++		snprintf(model_buf, sizeof(model_buf), "%.*s", (int)model_sz, model);
++		env_set("prod_id", prod_buf);
++		env_set("model", model_buf);
++		snprintf(board_name, sizeof(board_name), "%s-%s", prod_buf, model_buf);
++	} else {
 +		env_set("prod_id", DEFAULT_PROD_ID);
 +		env_set("model", DEFAULT_MODEL_ID);
 +		snprintf(board_name, sizeof(board_name), "%s-%s", DEFAULT_PROD_ID, DEFAULT_MODEL_ID);
-+	} else {
-+		env_set("prod_id", ep->prod_id);
-+		env_set("model", ep->model);
-+		snprintf(board_name, sizeof(board_name), "%s-%s", ep->prod_id, ep->model);
 +	}
 +	env_set("board_name", board_name);
 +}
 +
 +static void setup_serial(void)
 +{
-+	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++	size_t sz = 0;
++	const char *serial = get_field_ptr("serial", &sz);
++	char serial_buf[PERLE_SERIAL_LEN + 1] = { 0 };
 +
-+	env_set("serial#", ep->serial);
++	if (serial) {
++		snprintf(serial_buf, sizeof(serial_buf), "%.*s", (int)sz, serial);
++		env_set("serial#", serial_buf);
++	}
 +}
 +
 +static void set_env_mac_addr(void)
 +{
-+	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++	struct perle_am_eep *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++	const struct eep_ver_entry *entry = get_version_entry(ep->hdr.version);
++	uint8_t *payload_base = (uint8_t *)&ep->payload;
++	size_t i, m;
 +
-+	if (!do_board_detect()) {
-+		int i;
++	if (ep->hdr.magic != PERLE_EEP_HDR_MAGIC || !entry)
++		return;
 +
-+		for (i = 0; i < PERLE_WIFI_MAC_ADDR_CNT; i++) {
-+			if (is_valid_ethaddr(ep->wifi_mac_addr[i])) {
-+				eth_env_set_enetaddr_by_index("wifi", i, ep->wifi_mac_addr[i]);
-+			} else {
-+				debug("Invalid wifi mac%d address (%pM)\n", i, ep->wifi_mac_addr[i]);
-+			}
-+		}
-+		for (i = 0; i < PERLE_ETH_MAC_ADDR_CNT; i++) {
-+			if (is_valid_ethaddr(ep->eth_mac_addr[i])) {
-+				eth_env_set_enetaddr_by_index("eth", i, ep->eth_mac_addr[i]);
-+			} else {
-+				debug("Invalid eth mac%d address (%pM)\n", i, ep->eth_mac_addr[i]);
++	for (i = 0; i < entry->num_fields; i++) {
++		const struct eep_field_desc *f = &entry->fields[i];
++		if (f->type == TYPE_MAC_ARRAY) {
++			uint8_t *mac_base = payload_base + f->offset;
++			for (m = 0; m < f->count; m++) {
++				uint8_t *mac = mac_base + (m * f->size);
++				if (is_valid_ethaddr(mac)) {
++					eth_env_set_enetaddr_by_index(f->key_name, m, mac);
++				} else {
++					debug("Invalid %s%zu mac address (%pM)\n", f->key_name, m, mac);
++				}
 +			}
 +		}
 +	}
@@ -2777,37 +2912,47 @@ index 00000000000..cf7415f432e
 + */
 +static int generate_product_env_buf(char *buf, size_t buf_size)
 +{
-+    struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
-+    int len = 0;
-+    int i;
++	struct perle_am_eep *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++	const struct eep_ver_entry *entry = get_version_entry(ep->hdr.version);
++	uint8_t *payload_base = (uint8_t *)&ep->payload;
++	int len = 0;
++	size_t i, m, str_len;
 +
-+    /* Ensure EEPROM data is valid */
-+    if (do_board_detect() != 0) {
-+        pr_err("Error: Failed to read EEPROM for PRODUCT.ENV creation\n");
-+        return -1;
-+    }
++	if (ep->hdr.magic != PERLE_EEP_HDR_MAGIC || !entry || !entry->fields) {
++		pr_err("Error: Failed to read EEPROM for PRODUCT.ENV creation\n");
++		return -1;
++	}
 +
-+    /* Standard product fields */
-+    len += snprintf(buf + len, buf_size - len, "version=%04x\n", ep->version);
-+    len += snprintf(buf + len, buf_size - len, "serial=%.*s\n", PERLE_SERIAL_LEN, ep->serial);
-+    len += snprintf(buf + len, buf_size - len, "prod_id=%.*s\n", PERLE_PROD_ID_LEN, ep->prod_id);
-+    len += snprintf(buf + len, buf_size - len, "model=%.*s\n", PERLE_MODEL_LEN, ep->model);
-+    len += snprintf(buf + len, buf_size - len, "ssid=%.*s\n", PERLE_SSID_LEN, ep->ssid);
-+    len += snprintf(buf + len, buf_size - len, "password=%.*s\n", PERLE_PASSWORD_LEN, ep->password);
++	len += snprintf(buf + len, buf_size - len, "version=%04x\n", ep->hdr.version);
 +
-+    /* Wi-Fi MAC Addresses */
-+    for (i = 0; i < PERLE_WIFI_MAC_ADDR_CNT; i++) {
-+        len += snprintf(buf + len, buf_size - len, "wifi_mac%d=%pM\n",
-+                        i, ep->wifi_mac_addr[i]);
-+    }
++	for (i = 0; i < entry->num_fields; i++) {
++		const struct eep_field_desc *f = &entry->fields[i];
++		uint8_t *ptr = payload_base + f->offset;
 +
-+    /* Ethernet MAC Addresses */
-+    for (i = 0; i < PERLE_ETH_MAC_ADDR_CNT; i++) {
-+        len += snprintf(buf + len, buf_size - len, "eth_mac%d=%pM\n",
-+                        i, ep->eth_mac_addr[i]);
-+    }
++		switch (f->type) {
++		case TYPE_STRING:
++			str_len = strnlen_clean((char*)ptr, f->size);
++			len += snprintf(buf + len, buf_size - len, "%s=%.*s\n",
++							f->key_name, (int)str_len, (char *)ptr);
++			break;
++		case TYPE_UUID:
++			len += snprintf(buf + len, buf_size - len,
++							"%s=%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x\n",
++							f->key_name,
++							ptr[0], ptr[1], ptr[2], ptr[3], ptr[4], ptr[5], ptr[6], ptr[7],
++							ptr[8], ptr[9], ptr[10], ptr[11], ptr[12], ptr[13], ptr[14], ptr[15]);
++			break;
++		case TYPE_MAC_ARRAY:
++			for (m = 0; m < f->count; m++) {
++				uint8_t *mac = ptr + (m * f->size);
++				len += snprintf(buf + len, buf_size - len, "%s_mac%zu=%pM\n",
++								f->key_name, m, mac);
++			}
++			break;
++		}
++	}
 +
-+    return len;
++	return len;
 +}
 +
 +/**
@@ -2816,35 +2961,80 @@ index 00000000000..cf7415f432e
 + * @dev_part: Device and partition string (e.g., "1:1" or "0:1")
 + * @filepath: Target filename (e.g., "PRODUCT.ENV" or "/boot/PRODUCT.ENV")
 + */
++#define ENV_BUF_SIZE	2048
 +int write_product_env_file(const char *ifname, const char *dev_part, const char *filepath)
 +{
-+    char env_buffer[2048] = { 0 };
-+    loff_t actwrite;
-+    int len;
-+    int ret;
++	char *env_buffer = NULL;
++	char *existing_buffer = NULL;
++	loff_t actwrite, actread, file_size;
++	int len;
++	int ret;
 +
-+    len = generate_product_env_buf(env_buffer, sizeof(env_buffer));
-+    if (len <= 0)
-+        return -1;
-+
-+    /* Bind filesystem handler (FAT, EXT4, etc.) */
-+    ret = fs_set_blk_dev(ifname, dev_part, FS_TYPE_ANY);
-+    if (ret) {
-+        pr_err("PRODUCT.ENV: Failed to set device %s %s\n", ifname, dev_part);
-+        return ret;
++	/* Allocate DDR-backed memory for DMA safety */
++	env_buffer = calloc(1, ENV_BUF_SIZE);
++	existing_buffer = calloc(1, ENV_BUF_SIZE);
++	if (!env_buffer || !existing_buffer) {
++		pr_err("PRODUCT.ENV: Failed to allocate buffers. env_buffer %p, exisiting_buffer %p\n", env_buffer, existing_buffer);
++		ret = -ENOMEM;
++		goto out;
 +    }
++	len = generate_product_env_buf(env_buffer, ENV_BUF_SIZE);
++	if (len <= 0) {
++		ret = -1;
++		goto out;
++	}
++	debug("env_buffer : \n%s\n", env_buffer);
 +
-+    /* Write buffer to file */
-+    ret = fs_write(filepath, (ulong)env_buffer, 0, len, &actwrite);
-+    if (ret) {
-+        pr_err("PRODUCT.ENV: Failed to write file %s\n", filepath);
-+        return ret;
-+    }
++	/* Bind filesystem handler (FAT, EXT4, etc.) */
++	ret = fs_set_blk_dev(ifname, dev_part, FS_TYPE_ANY);
++	if (ret) {
++		pr_err("PRODUCT.ENV: Failed to set device %s %s\n", ifname, dev_part);
++		goto out;
++	}
 +
-+    printf("PRODUCT.ENV: Successfully wrote %lld bytes to %s:%s/%s\n",
-+           actwrite, ifname, dev_part, filepath);
++	/* Check if the file exists and get its size */
++	if (fs_size(filepath, &file_size) == 0) {
++		memset(existing_buffer, 0, sizeof(existing_buffer));
 +
-+    return 0;
++		debug("file_size = %lld vs len %d\n", file_size, len);
++		/* Re-bind to clear internal block offset left by fs_size */
++		fs_set_blk_dev(ifname, dev_part, FS_TYPE_ANY);
++
++		/* Pass 0 for len to tell fs_read to read up to EOF */
++		ret = fs_read(filepath, (ulong)existing_buffer, 0, 0, &actread);
++		debug("read len = %lld ret %d\n", actread, ret);
++		debug("existing_buffer : \n%s\n", existing_buffer);
++		if (ret == 0 && actread == len) {
++			if (memcmp(env_buffer, existing_buffer, len) == 0) {
++				printf("PRODUCT.ENV: File already exists and contents match (%d bytes). Skipping write.\n", len);
++				return 0;
++			}
++		}
++	}
++
++	/* Re-bind device to reset filesystem handle after reading/size check */
++	ret = fs_set_blk_dev(ifname, dev_part, FS_TYPE_ANY);
++	if (ret) {
++		pr_err("PRODUCT.ENV: Failed to re-bind device before write\n");
++		goto out;
++	}
++
++	/* Write buffer to file */
++	ret = fs_write(filepath, (ulong)env_buffer, 0, len, &actwrite);
++	if (ret) {
++		pr_err("PRODUCT.ENV: Failed to write file %s\n", filepath);
++		goto out;
++	}
++
++	printf("PRODUCT.ENV: Successfully wrote %lld bytes to %s:%s/%s\n",
++			actwrite, ifname, dev_part, filepath);
++
++out:
++	if (env_buffer)
++		free(env_buffer);
++	if (existing_buffer)
++		free(existing_buffer);
++	return ret;
 +}
 +#endif
 +#endif
@@ -2853,12 +3043,17 @@ index 00000000000..cf7415f432e
 +int board_late_init(void)
 +{
 +	if (IS_ENABLED(CONFIG_PERLE_I2C_BOARD_DETECT)) {
-+		setup_board_eeprom_env();
-+		setup_serial();
-+		set_env_mac_addr();
++	/* Ensure EEPROM data is valid */
++		if (do_board_detect() == 0) {
++			setup_board_eeprom_env();
++			setup_serial();
++			set_env_mac_addr();
 +
-+		/* Write PRODUCT.ENV to eMMC partition 0:2 */
-+		write_product_env_file("mmc", "0:2", "PRODUCT.ENV");
++			/* Write PRODUCT.ENV to eMMC partition 0:2 */
++			write_product_env_file("mmc", "0:2", "PRODUCT.ENV");
++		} else {
++			setup_board_eeprom_env();
++		}
 +	}
 +
 +	return 0;
@@ -2866,7 +3061,7 @@ index 00000000000..cf7415f432e
 +#endif
 +
 +#define CTRLMMR_USB0_PHY_CTRL	0x43004008
-+#define CORE_VOLTAGE		0x80000000
++#define CORE_VOLTAGE			0x80000000
 +
 +#ifdef CONFIG_SPL_BOARD_INIT
 +void spl_board_init(void)
@@ -2883,10 +3078,10 @@ index 00000000000..cf7415f432e
 +#endif
 diff --git a/board/perle/igos/igos.env b/board/perle/igos/igos.env
 new file mode 100644
-index 00000000000..1f48d4501a0
+index 00000000000..2f0cb9a8734
 --- /dev/null
 +++ b/board/perle/igos/igos.env
-@@ -0,0 +1,59 @@
+@@ -0,0 +1,66 @@
 +#include <environment/ti/ti_armv7_common.env>
 +#include <environment/ti/mmc.env>
 +#include <environment/ti/k3_dfu_combined.env>
@@ -2946,6 +3141,13 @@ index 00000000000..1f48d4501a0
 +fw_storage_interface=mmc
 +fw_dev_part=1:2
 +#endif
++
++scratch_addr=0x82000000
++eeprom_addr=0x50
++eeprom_off=0
++eeprom_size=0x100
++test_reset=setexpr next_addr ${scratch_addr} + 4; gpio read buttonval 123; if test $buttonval -eq 1; then setenv second_half 0x0a303d74; else setenv second_half 0x0a313d74; fi; mw.l ${scratch_addr} 0x65736572 1; mw.l ${next_addr} ${second_half} 1;\ fatwrite mmc 0:2 ${scratch_addr} /RESET.ENV 8
++uenvcmd=run test_reset; load mmc 0:2 ${kernel_addr_r} /EFI/VyOS/grubaa64.efi; load mmc 0:3 ${fdt_addr_r} /boot/dtb/perle/k3-am642-${prod_id}-${model}.dtb; bootefi ${kernel_addr_r} ${fdt_addr_r}
 diff --git a/board/perle/igos/pm-cfg.yaml b/board/perle/igos/pm-cfg.yaml
 new file mode 100644
 index 00000000000..c97495f482e

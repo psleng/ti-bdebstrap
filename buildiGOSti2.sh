@@ -227,6 +227,88 @@ function mkdeb() {
     rm -rf "$PKG"
 }
 
+function mkdeb_tpm_assets() {
+    # Make a .deb of OP-TEE TPM assets (.ta + udev rules)
+    VERS=$bsp_version
+    PKGNAME=optee-tpm-assets
+    ARCH=all
+    PKG=$(mktemp -t -d $PKGNAME-debXXXXX)
+    chmod go+rx $PKG
+    mkdir -p $PKG/DEBIAN
+
+    local optee_dir="${OPTEE_DIR:-${topdir}/build/${distro}/bsp_sources/optee_os}"
+    local ta_src_dir="${optee_dir}/out/arm-plat-k3/export-ta_arm64/ta"
+    local rules_src_dir="${optee_dir}/optee_client/tee-supplicant"
+
+    # The control file
+    cat > $PKG/DEBIAN/control <<-%
+	Package: $PKGNAME
+	Version: $VERS
+	Priority: optional
+	Architecture: $ARCH
+	Section: misc
+	Maintainer: Perle Systems <psleng@perle.com>
+	Homepage: https://github.com/psleng
+	Description: OP-TEE TPM assets for ${machine}
+	 Contains OP-TEE Trusted Application (.ta) files and tee-supplicant udev
+	 rules for machine: ${machine}, bsp_version: ${bsp_version}, distro: ${distro}.
+	%
+
+    # Validate source artifacts exist
+    shopt -s nullglob
+    local ta_files=("${ta_src_dir}"/*.ta)
+    local rules_files=("${rules_src_dir}"/*.rules)
+    shopt -u nullglob
+
+    if [ ${#ta_files[@]} -eq 0 ]; then
+        echo "W: $0: No TPM TA files found at ${ta_src_dir}; skipping ${PKGNAME} package" >&2
+        rm -rf "$PKG"
+        return 0
+    fi
+
+    if [ ${#rules_files[@]} -eq 0 ]; then
+        echo "W: $0: No tee-supplicant rules files found at ${rules_src_dir}; skipping ${PKGNAME} package" >&2
+        rm -rf "$PKG"
+        return 0
+    fi
+
+    # The data
+    mkdir -p "$PKG/usr/lib/firmware/optee"
+    cp -pr "${ta_src_dir}"/*.ta "$PKG/usr/lib/firmware/optee/"
+
+    mkdir -p "$PKG/etc/udev/rules.d"
+    cp -pr "${rules_src_dir}"/*.rules "$PKG/etc/udev/rules.d/"
+
+    # Changelog
+    CHANGELOG=$PKG/usr/share/doc/$PKGNAME/changelog.gz
+    mkdir -p $(dirname $CHANGELOG)
+    (
+     echo "$PKGNAME ($VERS) unstable; urgency=medium"
+     echo "  [ psleng ]"
+     echo "  * OP-TEE TPM assets (.ta + tee-supplicant udev rules)"
+     echo
+     echo " -- TI (nobody@example.com) $(date -R)"
+    ) | gzip -9 > $CHANGELOG
+
+    # Copyright
+    COPYRIGHT=$PKG/usr/share/doc/$PKGNAME/copyright
+    mkdir -p $(dirname $COPYRIGHT)
+    echo 'Copyright (C) 2016-2021 Texas Instruments Incorporated - https://www.ti.com' > $COPYRIGHT
+
+    # The md5sums
+    (cd $PKG; find . -type f | grep -v /DEBIAN | xargs md5sum) > $PKG/DEBIAN/md5sums
+
+    # Build package
+    fakeroot dpkg-deb --build $PKG
+
+    DEBPKG=${PKGNAME}_${VERS}_${ARCH}.deb
+    DST=${topdir}/ti-bdebstrap/$DEBPKG
+    mv -f $PKG.deb $DST
+    echo "I: $0: Made $(realpath $DST) from ${ta_src_dir} and ${rules_src_dir}"
+
+    rm -rf "$PKG"
+}
+
 export topdir=$(git rev-parse --show-toplevel)
 
 # Parse args
@@ -307,14 +389,38 @@ do
 
     uboot=${topdir}/build/${distro}/tisdk-debian-${distro}-${bsp_version}-boot
     ubootfile=$uboot/u-boot.img
-    if [ -f $ubootfile ]; then
-        echo "I: $0: skipping build_bsp since $ubootfile present"
-    else
-        rm -rf $uboot
+
+    # Build BSP when either u-boot payload or TPM asset inputs are missing.
+    # This guarantees --ubootonly can emit BOTH:
+    #   - u-boot_<ver>_<arch>.deb
+    #   - optee-tpm-assets_<ver>_all.deb
+    optee_dir=${topdir}/build/${distro}/bsp_sources/optee_os
+    ta_glob=${optee_dir}/out/arm-plat-k3/export-ta_arm64/ta/*.ta
+    rules_glob=${optee_dir}/optee_client/tee-supplicant/*.rules
+
+    need_bsp_build=0
+    if [ ! -f "$ubootfile" ]; then
+        need_bsp_build=1
+        echo "I: $0: build_bsp required - missing $ubootfile"
+    fi
+    if ! compgen -G "$ta_glob" > /dev/null; then
+        need_bsp_build=1
+        echo "I: $0: build_bsp required - missing TPM TA artifacts ($ta_glob)"
+    fi
+    if ! compgen -G "$rules_glob" > /dev/null; then
+        need_bsp_build=1
+        echo "I: $0: build_bsp required - missing tee-supplicant rules ($rules_glob)"
+    fi
+
+    if [ "$need_bsp_build" -eq 1 ]; then
+        rm -rf "$uboot"
         echo "I: $0: running build_bsp ${distro} ${machine} ${bsp_version}"
         build_bsp ${distro} ${machine} ${bsp_version}
+    else
+        echo "I: $0: skipping build_bsp - uboot and TPM asset inputs already present"
     fi
     mkdeb $uboot
+    mkdeb_tpm_assets
 
     if [ "$ubootonly" = 1 ]; then
         echo "I: $0: skipping package_and_clean because of --ubootonly"

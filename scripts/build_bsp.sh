@@ -216,13 +216,20 @@ bsp_version=$2
 # working REE_FS only      CFG_RPMB_FS=n CFG_REE_FS=y CFG_TEE_CORE_LOG_LEVEL=3 ta-targets=ta_arm64 ${make_args[*]} &>>"${LOG_FILE}"
 # working RPMB only        CFG_RPMB_FS=y CFG_REE_FS=n CFG_RPMB_TESTKEY=y CFG_RPMB_WRITE_KEY=y CFG_TEE_CORE_LOG_LEVEL=3 ta-targets=ta_arm64 ${make_args[*]} &>>"${LOG_FILE}"
 
-# PERLE added
-    log "> optee_ftpm: copying TA files to rootfs"
-    mkdir -p ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/usr/lib/firmware/optee &>> ${LOG_FILE}
-    cp ${OPTEE_DIR}/out/arm-plat-k3/export-ta_arm64/ta/*.ta ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/usr/lib/firmware/optee/ &>> ${LOG_FILE}
-    mkdir -p ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/udev/rules.d &>> ${LOG_FILE}
-    cp ${OPTEE_DIR}/optee_client/tee-supplicant/*.rules ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/udev/rules.d/ &>> ${LOG_FILE}
-    sudo cp ${topdir}/updates/openssl.cnf ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/ssl/openssl.cnf &>> ${LOG_FILE}
+    # Legacy direct rootfs injection of TPM/OP-TEE assets.
+    # Default OFF: artifacts are expected to be delivered via Debian packages
+    # (e.g. optee-tpm-assets) and later injected through vyos-build.
+    # Set LEGACY_TPM_ROOTFS_COPY=1 to restore historical copy behavior.
+    if [[ "${LEGACY_TPM_ROOTFS_COPY,,}" =~ ^(1|true|yes|y)$ ]]; then
+        log "> optee_ftpm: LEGACY_TPM_ROOTFS_COPY enabled - copying TA/rules/openssl to rootfs"
+        mkdir -p ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/usr/lib/firmware/optee &>> ${LOG_FILE}
+        cp ${OPTEE_DIR}/out/arm-plat-k3/export-ta_arm64/ta/*.ta ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/usr/lib/firmware/optee/ &>> ${LOG_FILE}
+        mkdir -p ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/udev/rules.d &>> ${LOG_FILE}
+        cp ${OPTEE_DIR}/optee_client/tee-supplicant/*.rules ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/udev/rules.d/ &>> ${LOG_FILE}
+        sudo cp ${topdir}/updates/openssl.cnf ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/ssl/openssl.cnf &>> ${LOG_FILE}
+    else
+        log "> optee_ftpm: skipping legacy rootfs copy (LEGACY_TPM_ROOTFS_COPY not enabled)"
+    fi
 }
 
 function build_uboot() {

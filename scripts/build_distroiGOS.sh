@@ -35,6 +35,7 @@ bsp_version=$2
 #         optee .ta, tee-supplicant and other firmware are updated to the rootfs now 
 #    rm -rf tisdk-debian-${distro}-${bsp_version}-rootfs
 #    cp -ra ../fs/ tisdk-debian-${distro}-${bsp_version}-rootfs
+    mkdir -p tisdk-debian-${distro}-${bsp_version}-rootfs
     cp -ra ../fs/* tisdk-debian-${distro}-${bsp_version}-rootfs/
 
     log "> Cleaning up ${build}"

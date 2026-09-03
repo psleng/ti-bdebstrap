@@ -258,6 +258,7 @@ function mkdeb_tpm_assets() {
     shopt -s nullglob
     local ta_files=("${ta_src_dir}"/*.ta)
     local rules_files=("${rules_src_dir}"/*.rules)
+    local rules_templates=("${rules_src_dir}"/*.rules.in)
     shopt -u nullglob
 
     if [ ${#ta_files[@]} -eq 0 ]; then
@@ -266,8 +267,8 @@ function mkdeb_tpm_assets() {
         return 0
     fi
 
-    if [ ${#rules_files[@]} -eq 0 ]; then
-        echo "W: $0: No tee-supplicant rules files found at ${rules_src_dir}; skipping ${PKGNAME} package" >&2
+    if [ ${#rules_files[@]} -eq 0 ] && [ ${#rules_templates[@]} -eq 0 ]; then
+        echo "W: $0: No tee-supplicant rules sources found at ${rules_src_dir}; skipping ${PKGNAME} package" >&2
         rm -rf "$PKG"
         return 0
     fi
@@ -277,7 +278,25 @@ function mkdeb_tpm_assets() {
     cp -pr "${ta_src_dir}"/*.ta "$PKG/usr/lib/firmware/optee/"
 
     mkdir -p "$PKG/etc/udev/rules.d"
-    cp -pr "${rules_src_dir}"/*.rules "$PKG/etc/udev/rules.d/"
+    if [ ${#rules_files[@]} -gt 0 ]; then
+        cp -pr "${rules_src_dir}"/*.rules "$PKG/etc/udev/rules.d/"
+    fi
+
+    # Newer optee_client may only provide template files (*.rules.in).
+    # Render them with current upstream defaults from tee-supplicant CMakeLists:
+    # CFG_TEE_SUPPL_USER=root, CFG_TEE_GROUP=root, CFG_TEEPRIV_GROUP=root.
+    if [ ${#rules_templates[@]} -gt 0 ]; then
+        local tpl
+        for tpl in "${rules_templates[@]}"; do
+            local out
+            out="$PKG/etc/udev/rules.d/$(basename "${tpl%.in}")"
+            sed \
+                -e 's/@CFG_TEE_SUPPL_USER@/root/g' \
+                -e 's/@CFG_TEE_GROUP@/root/g' \
+                -e 's/@CFG_TEEPRIV_GROUP@/root/g' \
+                "$tpl" > "$out"
+        done
+    fi
 
     # Changelog
     CHANGELOG=$PKG/usr/share/doc/$PKGNAME/changelog.gz

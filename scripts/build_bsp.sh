@@ -1,9 +1,9 @@
 #!/bin/bash
 
-ROOT_DIR=$(dirname $(dirname $0))
+ROOT_DIR=$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")
 DEFS_FILE=".defs.mk"
 
-. ${ROOT_DIR}/${DEFS_FILE}
+. "${ROOT_DIR}/${DEFS_FILE}"
 if [ "$BUILDTYPE" = "bookworm-am64xx-evm" ]; then
     ARM_A_CORE=a53
 elif [ "$BUILDTYPE" = "bookworm-j7200-evm" ]; then

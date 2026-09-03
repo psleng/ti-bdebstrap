@@ -219,7 +219,9 @@ function mkdeb() {
     fakeroot dpkg-deb --build $PKG
 
     DEBPKG=${PKGNAME}_${VERS}_${ARCH}.deb
-    DST=${topdir}/ti-bdebstrap/$DEBPKG
+    DEB_OUT_DIR=${TI_BDEBSTRAP_HOME:-${topdir}/ti-bdebstrap}
+    mkdir -p "$DEB_OUT_DIR"
+    DST=${DEB_OUT_DIR}/$DEBPKG
     mv -f $PKG.deb $DST
     echo "I: $0: Made $(realpath $DST) from $dir"
     # lintian $DEBPKG
@@ -228,7 +230,8 @@ function mkdeb() {
 }
 
 function mkdeb_tpm_assets() {
-    # Make a .deb of OP-TEE TPM assets (.ta + udev rules)
+    # Make a .deb of OP-TEE TPM runtime+assets
+    # (tee-supplicant + service + udev rules + TA files)
     VERS=$bsp_version
     PKGNAME=optee-tpm-assets
     ARCH=all
@@ -237,8 +240,11 @@ function mkdeb_tpm_assets() {
     mkdir -p $PKG/DEBIAN
 
     local optee_dir="${OPTEE_DIR:-${topdir}/build/${distro}/bsp_sources/optee_os}"
+    local rt_rootfs="${topdir}/build/${distro}/tisdk-debian-${distro}-${bsp_version}-rootfs"
     local ta_src_dir="${optee_dir}/out/arm-plat-k3/export-ta_arm64/ta"
     local rules_src_dir="${optee_dir}/optee_client/tee-supplicant"
+    local supp_bin=""
+    local supp_unit=""
 
     # The control file
     cat > $PKG/DEBIAN/control <<-%
@@ -250,9 +256,33 @@ function mkdeb_tpm_assets() {
 	Maintainer: Perle Systems <psleng@perle.com>
 	Homepage: https://github.com/psleng
 	Description: OP-TEE TPM assets for ${machine}
-	 Contains OP-TEE Trusted Application (.ta) files and tee-supplicant udev
-	 rules for machine: ${machine}, bsp_version: ${bsp_version}, distro: ${distro}.
+	 Contains OP-TEE runtime binaries and assets for machine: ${machine},
+	 bsp_version: ${bsp_version}, distro: ${distro}.
+	 Includes tee-supplicant runtime + systemd unit, udev rules and OP-TEE
+	 Trusted Application (.ta) files required by fTPM.
 	%
+
+    # Resolve runtime binary and service from preferred locations.
+    # Prefer staged rootfs artifacts, fall back to optee_client build outputs.
+    for p in \
+        "${rt_rootfs}/usr/sbin/tee-supplicant" \
+        "${optee_dir}/optee_client/tee-supplicant/tee-supplicant"
+    do
+        if [ -f "$p" ]; then
+            supp_bin="$p"
+            break
+        fi
+    done
+
+    for p in \
+        "${rt_rootfs}/usr/lib/systemd/system/tee-supplicant@.service" \
+        "${optee_dir}/optee_client/tee-supplicant/tee-supplicant@.service"
+    do
+        if [ -f "$p" ]; then
+            supp_unit="$p"
+            break
+        fi
+    done
 
     # Validate source artifacts exist
     shopt -s nullglob
@@ -273,7 +303,18 @@ function mkdeb_tpm_assets() {
         return 0
     fi
 
+    if [ -z "$supp_bin" ] || [ -z "$supp_unit" ]; then
+        echo "W: $0: Missing tee-supplicant runtime artifacts; skipping ${PKGNAME} package" >&2
+        echo "W: $0: searched runtime roots: ${rt_rootfs} and ${rules_src_dir}" >&2
+        rm -rf "$PKG"
+        return 0
+    fi
+
     # The data
+    mkdir -p "$PKG/usr/sbin" "$PKG/usr/lib/systemd/system"
+    cp -p "$supp_bin" "$PKG/usr/sbin/tee-supplicant"
+    cp -p "$supp_unit" "$PKG/usr/lib/systemd/system/tee-supplicant@.service"
+
     mkdir -p "$PKG/usr/lib/firmware/optee"
     cp -pr "${ta_src_dir}"/*.ta "$PKG/usr/lib/firmware/optee/"
 
@@ -321,14 +362,16 @@ function mkdeb_tpm_assets() {
     fakeroot dpkg-deb --build $PKG
 
     DEBPKG=${PKGNAME}_${VERS}_${ARCH}.deb
-    DST=${topdir}/ti-bdebstrap/$DEBPKG
+    DEB_OUT_DIR=${TI_BDEBSTRAP_HOME:-${topdir}/ti-bdebstrap}
+    mkdir -p "$DEB_OUT_DIR"
+    DST=${DEB_OUT_DIR}/$DEBPKG
     mv -f $PKG.deb $DST
     echo "I: $0: Made $(realpath $DST) from ${ta_src_dir} and ${rules_src_dir}"
 
     rm -rf "$PKG"
 }
 
-export topdir=$(git rev-parse --show-toplevel)
+export topdir="${NEXUS_ROOT:-$(git rev-parse --show-toplevel)}"
 
 # Parse args
 ARGS=$(getopt --options='' --longoptions=repo:,ubootonly --name "$0" -- "$@") || exit 1
@@ -409,13 +452,19 @@ do
     uboot=${topdir}/build/${distro}/tisdk-debian-${distro}-${bsp_version}-boot
     ubootfile=$uboot/u-boot.img
 
-    # Build BSP when either u-boot payload or TPM asset inputs are missing.
+    # Build BSP when either u-boot payload or OP-TEE runtime/asset inputs are missing.
     # This guarantees --ubootonly can emit BOTH:
     #   - u-boot_<ver>_<arch>.deb
     #   - optee-tpm-assets_<ver>_all.deb
     optee_dir=${topdir}/build/${distro}/bsp_sources/optee_os
+    rt_rootfs=${topdir}/build/${distro}/tisdk-debian-${distro}-${bsp_version}-rootfs
     ta_glob=${optee_dir}/out/arm-plat-k3/export-ta_arm64/ta/*.ta
     rules_glob=${optee_dir}/optee_client/tee-supplicant/*.rules
+    rules_tpl_glob=${optee_dir}/optee_client/tee-supplicant/*.rules.in
+    supp_bin_rootfs=${rt_rootfs}/usr/sbin/tee-supplicant
+    supp_bin_src=${optee_dir}/optee_client/tee-supplicant/tee-supplicant
+    supp_unit_rootfs=${rt_rootfs}/usr/lib/systemd/system/tee-supplicant@.service
+    supp_unit_src=${optee_dir}/optee_client/tee-supplicant/tee-supplicant@.service
 
     need_bsp_build=0
     if [ ! -f "$ubootfile" ]; then
@@ -426,9 +475,17 @@ do
         need_bsp_build=1
         echo "I: $0: build_bsp required - missing TPM TA artifacts ($ta_glob)"
     fi
-    if ! compgen -G "$rules_glob" > /dev/null; then
+    if ! compgen -G "$rules_glob" > /dev/null && ! compgen -G "$rules_tpl_glob" > /dev/null; then
         need_bsp_build=1
-        echo "I: $0: build_bsp required - missing tee-supplicant rules ($rules_glob)"
+        echo "I: $0: build_bsp required - missing tee-supplicant rules ($rules_glob or $rules_tpl_glob)"
+    fi
+    if [ ! -f "$supp_bin_rootfs" ] && [ ! -f "$supp_bin_src" ]; then
+        need_bsp_build=1
+        echo "I: $0: build_bsp required - missing tee-supplicant binary"
+    fi
+    if [ ! -f "$supp_unit_rootfs" ] && [ ! -f "$supp_unit_src" ]; then
+        need_bsp_build=1
+        echo "I: $0: build_bsp required - missing tee-supplicant service unit"
     fi
 
     if [ "$need_bsp_build" -eq 1 ]; then
@@ -456,4 +513,3 @@ do
     fi
 
 done
-

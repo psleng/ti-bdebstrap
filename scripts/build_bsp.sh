@@ -314,4 +314,3 @@ bsp_version=$2
         ;;
     esac
 }
-

@@ -243,6 +243,8 @@ function mkdeb_tpm_assets() {
     local rt_rootfs="${topdir}/build/${distro}/tisdk-debian-${distro}-${bsp_version}-rootfs"
     local ta_src_dir="${optee_dir}/out/arm-plat-k3/export-ta_arm64/ta"
     local rules_src_dir="${optee_dir}/optee_client/tee-supplicant"
+    local teec_lib=""
+    local teec_pc=""
     local supp_bin=""
     local supp_unit=""
 
@@ -284,6 +286,28 @@ function mkdeb_tpm_assets() {
         fi
     done
 
+    # Resolve libteec static lib + pkg-config metadata.
+    # Prefer staged rootfs artifacts, fall back to optee_client build outputs.
+    for p in \
+        "${rt_rootfs}/usr/lib/libteec.a" \
+        "${optee_dir}/optee_client/libteec/libteec.a"
+    do
+        if [ -f "$p" ]; then
+            teec_lib="$p"
+            break
+        fi
+    done
+
+    for p in \
+        "${rt_rootfs}/usr/lib/pkgconfig/teec.pc" \
+        "${optee_dir}/optee_client/libteec/teec.pc"
+    do
+        if [ -f "$p" ]; then
+            teec_pc="$p"
+            break
+        fi
+    done
+
     # Validate source artifacts exist
     shopt -s nullglob
     local ta_files=("${ta_src_dir}"/*.ta)
@@ -303,9 +327,10 @@ function mkdeb_tpm_assets() {
         return 0
     fi
 
-    if [ -z "$supp_bin" ] || [ -z "$supp_unit" ]; then
+    if [ -z "$supp_bin" ] || [ -z "$supp_unit" ] || [ -z "$teec_lib" ] || [ -z "$teec_pc" ]; then
         echo "W: $0: Missing tee-supplicant runtime artifacts; skipping ${PKGNAME} package" >&2
         echo "W: $0: searched runtime roots: ${rt_rootfs} and ${rules_src_dir}" >&2
+        echo "W: $0: tee-supplicant=${supp_bin:-missing} unit=${supp_unit:-missing} libteec=${teec_lib:-missing} teec.pc=${teec_pc:-missing}" >&2
         rm -rf "$PKG"
         return 0
     fi
@@ -314,6 +339,10 @@ function mkdeb_tpm_assets() {
     mkdir -p "$PKG/usr/sbin" "$PKG/usr/lib/systemd/system"
     cp -p "$supp_bin" "$PKG/usr/sbin/tee-supplicant"
     cp -p "$supp_unit" "$PKG/usr/lib/systemd/system/tee-supplicant@.service"
+
+    mkdir -p "$PKG/usr/lib/pkgconfig"
+    cp -p "$teec_lib" "$PKG/usr/lib/libteec.a"
+    cp -p "$teec_pc" "$PKG/usr/lib/pkgconfig/teec.pc"
 
     mkdir -p "$PKG/usr/lib/firmware/optee"
     cp -pr "${ta_src_dir}"/*.ta "$PKG/usr/lib/firmware/optee/"
@@ -339,13 +368,17 @@ function mkdeb_tpm_assets() {
         done
     fi
 
+    # Mirror udev rules into /usr/etc path used by TI rootfs layout.
+    mkdir -p "$PKG/usr/etc/udev/rules.d"
+    cp -pr "$PKG/etc/udev/rules.d"/*.rules "$PKG/usr/etc/udev/rules.d/"
+
     # Changelog
     CHANGELOG=$PKG/usr/share/doc/$PKGNAME/changelog.gz
     mkdir -p $(dirname $CHANGELOG)
     (
      echo "$PKGNAME ($VERS) unstable; urgency=medium"
      echo "  [ psleng ]"
-     echo "  * OP-TEE TPM assets (.ta + tee-supplicant udev rules)"
+    echo "  * OP-TEE TPM runtime+assets (tee-supplicant + libteec + udev rules + .ta)"
      echo
      echo " -- TI (nobody@example.com) $(date -R)"
     ) | gzip -9 > $CHANGELOG

@@ -259,6 +259,7 @@ bsp_version=$2
     make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} BL31=${TFA_DIR}/build/k3/${platform}/release/bl31.bin TEE=${OPTEE_DIR}/out/arm-plat-k3/core/tee-pager_v2.bin BINMAN_INDIRS=${FW_DIR} O=${UBOOT_DIR}/out/${ARM_A_CORE} &>>"${LOG_FILE}"
     cp ${UBOOT_DIR}/out/${ARM_A_CORE}/tispl.bin ${OUTDIR}/ &>> ${LOG_FILE}
     cp ${UBOOT_DIR}/out/${ARM_A_CORE}/u-boot.img ${OUTDIR}/ &>> ${LOG_FILE}
+    copy_secure_boot_artifacts ${OUTDIR} ${platform}
 
 	case ${machine} in
 		am62pxx-evm | am62xx-evm | am62xx-lp-evm | am62xxsip-evm)
@@ -308,9 +309,35 @@ bsp_version=$2
         make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} BL31=${TFA_DIR}/build/k3/${platform}/release/bl31.bin TEE=${OPTEE_DIR}/out/arm-plat-k3/core/tee-pager_v2.bin BINMAN_INDIRS=${FW_DIR} O=${UBOOT_DIR}/out/${ARM_A_CORE} &>>"${LOG_FILE}"
         cp ${UBOOT_DIR}/out/${ARM_A_CORE}/tispl.bin ${OUTDIR}/ &>> ${LOG_FILE}
         cp ${UBOOT_DIR}/out/${ARM_A_CORE}/u-boot.img ${OUTDIR}/ &>> ${LOG_FILE}
+        copy_secure_boot_artifacts ${OUTDIR} ${platform}
 
         # restore original env file, if debugging.  Normally, the entire bsp_sources are removed
         cp ${ENV_PATH}/${ENV_NAME}.env.orig ${ENV_PATH}/${ENV_NAME}.env
         ;;
     esac
+}
+
+function copy_secure_boot_artifacts() {
+outdir=$1
+platform=$2
+
+    local tfa_release_dir="${TFA_DIR}/build/k3/${platform}/release"
+    local optee_core_dir="${OPTEE_DIR}/out/arm-plat-k3/core"
+
+    # Export standalone secure-boot artifacts in addition to tispl.bin.
+    # These are useful for debugging/verification and downstream packaging.
+    for src in \
+        "${tfa_release_dir}/bl31.bin" \
+        "${optee_core_dir}/tee.bin" \
+        "${optee_core_dir}/tee-raw.bin" \
+        "${optee_core_dir}/tee-pager_v2.bin" \
+        "${optee_core_dir}/tee-pageable_v2.bin" \
+        "${optee_core_dir}/tee-header_v2.bin"
+    do
+        if [ -f "${src}" ]; then
+            cp "${src}" "${outdir}/" &>> "${LOG_FILE}"
+        else
+            log "> warning: missing secure artifact ${src}"
+        fi
+    done
 }

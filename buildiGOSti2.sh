@@ -404,6 +404,92 @@ function mkdeb_tpm_assets() {
     rm -rf "$PKG"
 }
 
+function mkdeb_optee_binaries() {
+    # Make a .deb of standalone secure boot binaries (ATF + OP-TEE core)
+    VERS=$bsp_version
+    ARCH=$(dpkg-architecture -q DEB_BUILD_ARCH)
+    PKGNAME=optee-binaries
+    PKG=$(mktemp -t -d $PKGNAME-debXXXXX)
+    chmod go+rx $PKG
+    mkdir -p $PKG/DEBIAN
+
+    local optee_dir="${OPTEE_DIR:-${topdir}/build/${distro}/bsp_sources/optee_os}"
+    local tfa_dir="${TFA_DIR:-${topdir}/build/${distro}/bsp_sources/trusted-firmware-a}"
+    local optee_core_dir="${optee_dir}/out/arm-plat-k3/core"
+    local tfa_release_dir="${tfa_dir}/build/k3/${platform}/release"
+    local out_dir="$PKG/usr/lib/optee/platform/${machine}"
+
+    cat > $PKG/DEBIAN/control <<-%
+	Package: $PKGNAME
+	Version: $VERS
+	Priority: optional
+	Architecture: $ARCH
+	Section: misc
+	Maintainer: Perle Systems <psleng@perle.com>
+	Homepage: https://github.com/psleng
+	Description: Standalone OP-TEE/ATF binaries for ${machine}
+	 Contains OP-TEE core and ATF binaries extracted from BSP build outputs.
+	 machine: ${machine}
+	 bsp_version: ${bsp_version}
+	 distro: ${distro}
+	%
+
+    mkdir -p "$out_dir"
+
+    local copied=0
+    local src
+    for src in \
+        "${tfa_release_dir}/bl31.bin" \
+        "${optee_core_dir}/tee.bin" \
+        "${optee_core_dir}/tee-raw.bin" \
+        "${optee_core_dir}/tee-pager_v2.bin" \
+        "${optee_core_dir}/tee-pageable_v2.bin" \
+        "${optee_core_dir}/tee-header_v2.bin"
+    do
+        if [ -f "$src" ]; then
+            cp -p "$src" "$out_dir/"
+            copied=$((copied + 1))
+        else
+            echo "W: $0: Missing secure binary $src; continuing" >&2
+        fi
+    done
+
+    if [ "$copied" -eq 0 ]; then
+        echo "W: $0: No OP-TEE/ATF binaries found; skipping ${PKGNAME} package" >&2
+        rm -rf "$PKG"
+        return 0
+    fi
+
+    ln -sfn "platform/${machine}" "$PKG/usr/lib/optee/current"
+
+    CHANGELOG=$PKG/usr/share/doc/$PKGNAME/changelog.gz
+    mkdir -p $(dirname $CHANGELOG)
+    (
+     echo "$PKGNAME ($VERS) unstable; urgency=medium"
+     echo "  [ psleng ]"
+     echo "  * Standalone OP-TEE/ATF binaries (bl31 + tee core images)"
+     echo
+     echo " -- TI (nobody@example.com) $(date -R)"
+    ) | gzip -9 > $CHANGELOG
+
+    COPYRIGHT=$PKG/usr/share/doc/$PKGNAME/copyright
+    mkdir -p $(dirname $COPYRIGHT)
+    echo 'Copyright (C) 2016-2021 Texas Instruments Incorporated - https://www.ti.com' > $COPYRIGHT
+
+    (cd $PKG; find . -type f | grep -v /DEBIAN | xargs md5sum) > $PKG/DEBIAN/md5sums
+
+    fakeroot dpkg-deb --build $PKG
+
+    DEBPKG=${PKGNAME}_${VERS}_${ARCH}.deb
+    DEB_OUT_DIR=${TI_BDEBSTRAP_HOME:-${topdir}/ti-bdebstrap}
+    mkdir -p "$DEB_OUT_DIR"
+    DST=${DEB_OUT_DIR}/$DEBPKG
+    mv -f $PKG.deb $DST
+    echo "I: $0: Made $(realpath $DST) from ${tfa_release_dir} and ${optee_core_dir}"
+
+    rm -rf "$PKG"
+}
+
 export topdir="${NEXUS_ROOT:-$(git rev-parse --show-toplevel)}"
 
 # Parse args
@@ -460,6 +546,7 @@ do
     fi
 
     bsp_version=($(read_bsp_config ${distro} bsp_version))
+    platform=($(read_machine_config ${machine} atf_target_board ${bsp_version}))
 
     export host_arch=`uname -m`
     export native_build=false
@@ -498,6 +585,8 @@ do
     supp_bin_src=${optee_dir}/optee_client/tee-supplicant/tee-supplicant
     supp_unit_rootfs=${rt_rootfs}/usr/lib/systemd/system/tee-supplicant@.service
     supp_unit_src=${optee_dir}/optee_client/tee-supplicant/tee-supplicant@.service
+    bl31_file=${topdir}/build/${distro}/bsp_sources/trusted-firmware-a/build/k3/${platform}/release/bl31.bin
+    tee_pager_file=${optee_dir}/out/arm-plat-k3/core/tee-pager_v2.bin
 
     need_bsp_build=0
     if [ ! -f "$ubootfile" ]; then
@@ -520,6 +609,10 @@ do
         need_bsp_build=1
         echo "I: $0: build_bsp required - missing tee-supplicant service unit"
     fi
+    if [ ! -f "$bl31_file" ] || [ ! -f "$tee_pager_file" ]; then
+        need_bsp_build=1
+        echo "I: $0: build_bsp required - missing secure binaries (bl31/tee-pager)"
+    fi
 
     if [ "$need_bsp_build" -eq 1 ]; then
         rm -rf "$uboot"
@@ -530,6 +623,7 @@ do
     fi
     mkdeb $uboot
     mkdeb_tpm_assets
+    mkdeb_optee_binaries
 
     if [ "$ubootonly" = 1 ]; then
         echo "I: $0: skipping package_and_clean because of --ubootonly"

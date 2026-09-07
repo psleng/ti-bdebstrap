@@ -35,6 +35,7 @@ bsp_version=$2
 #         optee .ta, tee-supplicant and other firmware are updated to the rootfs now 
 #    rm -rf tisdk-debian-${distro}-${bsp_version}-rootfs
 #    cp -ra ../fs/ tisdk-debian-${distro}-${bsp_version}-rootfs
+    mkdir -p tisdk-debian-${distro}-${bsp_version}-rootfs
     cp -ra ../fs/* tisdk-debian-${distro}-${bsp_version}-rootfs/
 
     log "> Cleaning up ${build}"
@@ -63,7 +64,11 @@ bsp_version=$2
     fi
 
 # PERLE - comment out below for debugging: optee, ti-uboot, etc will build if source is left around
-    rm -rf bsp_sources
+    if [[ "${KEEP_BSP_SOURCES,,}" =~ ^(1|true|yes|y)$ ]]; then
+        log "> Keeping bsp_sources (KEEP_BSP_SOURCES=${KEEP_BSP_SOURCES})"
+    else
+        rm -rf bsp_sources
+    fi
 
     cd ${topdir}/build/
 

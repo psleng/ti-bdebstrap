@@ -60,11 +60,20 @@ the `configs/bdebstrap_configs/` directory.
 
 Running these scripts requires root privileges.
 
-##### General Syntax:
+### General Syntax
 
 ```bash
 sudo ./build.sh <build>
 ```
+
+To keep unpacked BSP sources after a build (for inspection/debugging, e.g. DTBs),
+set `KEEP_BSP_SOURCES` when running the build:
+
+```bash
+sudo KEEP_BSP_SOURCES=1 ./build.sh <build>
+```
+
+The sources will remain at `build/<build>/bsp_sources/`.
 
 Each successful build is placed in `build/` directory. Logs for each build are
 placed in the `logs/` directory.
@@ -119,5 +128,5 @@ sudo ./create-wic.sh am62-bookworm-09.01.00.008
 ```
 
 This command will generate a `tisdk-debian-bookworm-am62xx-evm.wic.xz` image at
- `<ti-bdebstrap>/build/am62-bookworm-09.01.00.008/`
+`<ti-bdebstrap>/build/am62-bookworm-09.01.00.008/`
 

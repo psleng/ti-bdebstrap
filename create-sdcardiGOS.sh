@@ -717,8 +717,21 @@ sync
 # PSL - add squashfs option that creates a iso type squashfs rootfs
 if [ "$fstype" = "squashfs" ] ; then
     echo "Copying squashed rootfs System partition"
-    # copy to the sdcard as well
-    cp -a $ISOPARSEPATH/stage_iso/. $PATH_TO_SDROOTFS
+    # stage_iso is retired; copy the expanded tree straight from the authoritative
+    # vyos-build ISO (loop-mounted read-only). The boot partition still comes from
+    # images/.../tisdk-*-boot.squashfs above.
+    ARCH=$(dpkg-architecture -qDEB_HOST_ARCH)
+    LIVE_IMAGE_ISO=./vyos-build/build/live-image-$ARCH.hybrid.iso
+    if [ ! -e "$LIVE_IMAGE_ISO" ]; then
+        echo "Error: missing vyos-build ISO: $LIVE_IMAGE_ISO"
+        exit 1
+    fi
+    ISO_LOOP=$(sudo losetup --show -f "$LIVE_IMAGE_ISO")
+    sudo mkdir -p "$PATH_TO_TMP_DIR/vyos-iso"
+    sudo mount -o ro "$ISO_LOOP" "$PATH_TO_TMP_DIR/vyos-iso"
+    sudo cp -a "$PATH_TO_TMP_DIR/vyos-iso/." "$PATH_TO_SDROOTFS"
+    sudo umount "$PATH_TO_TMP_DIR/vyos-iso"
+    sudo losetup -d "$ISO_LOOP"
 else
     echo "Copying flat rootfs System partition"
     # rsync -aHAX $ROOTFSPATH $PATH_TO_SDROOTFS

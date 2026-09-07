@@ -219,7 +219,9 @@ function mkdeb() {
     fakeroot dpkg-deb --build $PKG
 
     DEBPKG=${PKGNAME}_${VERS}_${ARCH}.deb
-    DST=${topdir}/ti-bdebstrap/$DEBPKG
+    DEB_OUT_DIR=${TI_BDEBSTRAP_HOME:-${topdir}/ti-bdebstrap}
+    mkdir -p "$DEB_OUT_DIR"
+    DST=${DEB_OUT_DIR}/$DEBPKG
     mv -f $PKG.deb $DST
     echo "I: $0: Made $(realpath $DST) from $dir"
     # lintian $DEBPKG
@@ -227,7 +229,268 @@ function mkdeb() {
     rm -rf "$PKG"
 }
 
-export topdir=$(git rev-parse --show-toplevel)
+function mkdeb_tpm_assets() {
+    # Make a .deb of OP-TEE TPM runtime+assets
+    # (tee-supplicant + service + udev rules + TA files)
+    VERS=$bsp_version
+    PKGNAME=optee-tpm-assets
+    ARCH=all
+    PKG=$(mktemp -t -d $PKGNAME-debXXXXX)
+    chmod go+rx $PKG
+    mkdir -p $PKG/DEBIAN
+
+    local optee_dir="${OPTEE_DIR:-${topdir}/build/${distro}/bsp_sources/optee_os}"
+    local rt_rootfs="${topdir}/build/${distro}/tisdk-debian-${distro}-${bsp_version}-rootfs"
+    local ta_src_dir="${optee_dir}/out/arm-plat-k3/export-ta_arm64/ta"
+    local rules_src_dir="${optee_dir}/optee_client/tee-supplicant"
+    local teec_lib=""
+    local teec_pc=""
+    local supp_bin=""
+    local supp_unit=""
+
+    # The control file
+    cat > $PKG/DEBIAN/control <<-%
+	Package: $PKGNAME
+	Version: $VERS
+	Priority: optional
+	Architecture: $ARCH
+	Section: misc
+	Maintainer: Perle Systems <psleng@perle.com>
+	Homepage: https://github.com/psleng
+	Description: OP-TEE TPM assets for ${machine}
+	 Contains OP-TEE runtime binaries and assets for machine: ${machine},
+	 bsp_version: ${bsp_version}, distro: ${distro}.
+	 Includes tee-supplicant runtime + systemd unit, udev rules and OP-TEE
+	 Trusted Application (.ta) files required by fTPM.
+	%
+
+    # Resolve runtime binary and service from preferred locations.
+    # Prefer staged rootfs artifacts, fall back to optee_client build outputs.
+    for p in \
+        "${rt_rootfs}/usr/sbin/tee-supplicant" \
+        "${optee_dir}/optee_client/tee-supplicant/tee-supplicant"
+    do
+        if [ -f "$p" ]; then
+            supp_bin="$p"
+            break
+        fi
+    done
+
+    for p in \
+        "${rt_rootfs}/usr/lib/systemd/system/tee-supplicant@.service" \
+        "${optee_dir}/optee_client/tee-supplicant/tee-supplicant@.service"
+    do
+        if [ -f "$p" ]; then
+            supp_unit="$p"
+            break
+        fi
+    done
+
+    # Resolve libteec static lib + pkg-config metadata.
+    # Prefer staged rootfs artifacts, fall back to optee_client build outputs.
+    for p in \
+        "${rt_rootfs}/usr/lib/libteec.a" \
+        "${optee_dir}/optee_client/libteec/libteec.a"
+    do
+        if [ -f "$p" ]; then
+            teec_lib="$p"
+            break
+        fi
+    done
+
+    for p in \
+        "${rt_rootfs}/usr/lib/pkgconfig/teec.pc" \
+        "${optee_dir}/optee_client/libteec/teec.pc"
+    do
+        if [ -f "$p" ]; then
+            teec_pc="$p"
+            break
+        fi
+    done
+
+    # Validate source artifacts exist
+    shopt -s nullglob
+    local ta_files=("${ta_src_dir}"/*.ta)
+    local rules_files=("${rules_src_dir}"/*.rules)
+    local rules_templates=("${rules_src_dir}"/*.rules.in)
+    shopt -u nullglob
+
+    if [ ${#ta_files[@]} -eq 0 ]; then
+        echo "W: $0: No TPM TA files found at ${ta_src_dir}; skipping ${PKGNAME} package" >&2
+        rm -rf "$PKG"
+        return 0
+    fi
+
+    if [ ${#rules_files[@]} -eq 0 ] && [ ${#rules_templates[@]} -eq 0 ]; then
+        echo "W: $0: No tee-supplicant rules sources found at ${rules_src_dir}; skipping ${PKGNAME} package" >&2
+        rm -rf "$PKG"
+        return 0
+    fi
+
+    if [ -z "$supp_bin" ] || [ -z "$supp_unit" ] || [ -z "$teec_lib" ] || [ -z "$teec_pc" ]; then
+        echo "W: $0: Missing tee-supplicant runtime artifacts; skipping ${PKGNAME} package" >&2
+        echo "W: $0: searched runtime roots: ${rt_rootfs} and ${rules_src_dir}" >&2
+        echo "W: $0: tee-supplicant=${supp_bin:-missing} unit=${supp_unit:-missing} libteec=${teec_lib:-missing} teec.pc=${teec_pc:-missing}" >&2
+        rm -rf "$PKG"
+        return 0
+    fi
+
+    # The data
+    mkdir -p "$PKG/usr/sbin" "$PKG/usr/lib/systemd/system"
+    cp -p "$supp_bin" "$PKG/usr/sbin/tee-supplicant"
+    cp -p "$supp_unit" "$PKG/usr/lib/systemd/system/tee-supplicant@.service"
+
+    mkdir -p "$PKG/usr/lib/pkgconfig"
+    cp -p "$teec_lib" "$PKG/usr/lib/libteec.a"
+    cp -p "$teec_pc" "$PKG/usr/lib/pkgconfig/teec.pc"
+
+    mkdir -p "$PKG/usr/lib/firmware/optee"
+    cp -pr "${ta_src_dir}"/*.ta "$PKG/usr/lib/firmware/optee/"
+
+    mkdir -p "$PKG/etc/udev/rules.d"
+    if [ ${#rules_files[@]} -gt 0 ]; then
+        cp -pr "${rules_src_dir}"/*.rules "$PKG/etc/udev/rules.d/"
+    fi
+
+    # Newer optee_client may only provide template files (*.rules.in).
+    # Render them with current upstream defaults from tee-supplicant CMakeLists:
+    # CFG_TEE_SUPPL_USER=root, CFG_TEE_GROUP=root, CFG_TEEPRIV_GROUP=root.
+    if [ ${#rules_templates[@]} -gt 0 ]; then
+        local tpl
+        for tpl in "${rules_templates[@]}"; do
+            local out
+            out="$PKG/etc/udev/rules.d/$(basename "${tpl%.in}")"
+            sed \
+                -e 's/@CFG_TEE_SUPPL_USER@/root/g' \
+                -e 's/@CFG_TEE_GROUP@/root/g' \
+                -e 's/@CFG_TEEPRIV_GROUP@/root/g' \
+                "$tpl" > "$out"
+        done
+    fi
+
+    # Mirror udev rules into /usr/etc path used by TI rootfs layout.
+    mkdir -p "$PKG/usr/etc/udev/rules.d"
+    cp -pr "$PKG/etc/udev/rules.d"/*.rules "$PKG/usr/etc/udev/rules.d/"
+
+    # Changelog
+    CHANGELOG=$PKG/usr/share/doc/$PKGNAME/changelog.gz
+    mkdir -p $(dirname $CHANGELOG)
+    (
+     echo "$PKGNAME ($VERS) unstable; urgency=medium"
+     echo "  [ psleng ]"
+    echo "  * OP-TEE TPM runtime+assets (tee-supplicant + libteec + udev rules + .ta)"
+     echo
+     echo " -- TI (nobody@example.com) $(date -R)"
+    ) | gzip -9 > $CHANGELOG
+
+    # Copyright
+    COPYRIGHT=$PKG/usr/share/doc/$PKGNAME/copyright
+    mkdir -p $(dirname $COPYRIGHT)
+    echo 'Copyright (C) 2016-2021 Texas Instruments Incorporated - https://www.ti.com' > $COPYRIGHT
+
+    # The md5sums
+    (cd $PKG; find . -type f | grep -v /DEBIAN | xargs md5sum) > $PKG/DEBIAN/md5sums
+
+    # Build package
+    fakeroot dpkg-deb --build $PKG
+
+    DEBPKG=${PKGNAME}_${VERS}_${ARCH}.deb
+    DEB_OUT_DIR=${TI_BDEBSTRAP_HOME:-${topdir}/ti-bdebstrap}
+    mkdir -p "$DEB_OUT_DIR"
+    DST=${DEB_OUT_DIR}/$DEBPKG
+    mv -f $PKG.deb $DST
+    echo "I: $0: Made $(realpath $DST) from ${ta_src_dir} and ${rules_src_dir}"
+
+    rm -rf "$PKG"
+}
+
+function mkdeb_optee_binaries() {
+    # Make a .deb of standalone secure boot binaries (ATF + OP-TEE core)
+    VERS=$bsp_version
+    ARCH=$(dpkg-architecture -q DEB_BUILD_ARCH)
+    PKGNAME=optee-binaries
+    PKG=$(mktemp -t -d $PKGNAME-debXXXXX)
+    chmod go+rx $PKG
+    mkdir -p $PKG/DEBIAN
+
+    local optee_dir="${OPTEE_DIR:-${topdir}/build/${distro}/bsp_sources/optee_os}"
+    local tfa_dir="${TFA_DIR:-${topdir}/build/${distro}/bsp_sources/trusted-firmware-a}"
+    local optee_core_dir="${optee_dir}/out/arm-plat-k3/core"
+    local tfa_release_dir="${tfa_dir}/build/k3/${platform}/release"
+    local out_dir="$PKG/usr/lib/optee/platform/${machine}"
+
+    cat > $PKG/DEBIAN/control <<-%
+	Package: $PKGNAME
+	Version: $VERS
+	Priority: optional
+	Architecture: $ARCH
+	Section: misc
+	Maintainer: Perle Systems <psleng@perle.com>
+	Homepage: https://github.com/psleng
+	Description: Standalone OP-TEE/ATF binaries for ${machine}
+	 Contains OP-TEE core and ATF binaries extracted from BSP build outputs.
+	 machine: ${machine}
+	 bsp_version: ${bsp_version}
+	 distro: ${distro}
+	%
+
+    mkdir -p "$out_dir"
+
+    local copied=0
+    local src
+    for src in \
+        "${tfa_release_dir}/bl31.bin" \
+        "${optee_core_dir}/tee.bin" \
+        "${optee_core_dir}/tee-raw.bin" \
+        "${optee_core_dir}/tee-pager_v2.bin" \
+        "${optee_core_dir}/tee-pageable_v2.bin" \
+        "${optee_core_dir}/tee-header_v2.bin"
+    do
+        if [ -f "$src" ]; then
+            cp -p "$src" "$out_dir/"
+            copied=$((copied + 1))
+        else
+            echo "W: $0: Missing secure binary $src; continuing" >&2
+        fi
+    done
+
+    if [ "$copied" -eq 0 ]; then
+        echo "W: $0: No OP-TEE/ATF binaries found; skipping ${PKGNAME} package" >&2
+        rm -rf "$PKG"
+        return 0
+    fi
+
+    ln -sfn "platform/${machine}" "$PKG/usr/lib/optee/current"
+
+    CHANGELOG=$PKG/usr/share/doc/$PKGNAME/changelog.gz
+    mkdir -p $(dirname $CHANGELOG)
+    (
+     echo "$PKGNAME ($VERS) unstable; urgency=medium"
+     echo "  [ psleng ]"
+     echo "  * Standalone OP-TEE/ATF binaries (bl31 + tee core images)"
+     echo
+     echo " -- TI (nobody@example.com) $(date -R)"
+    ) | gzip -9 > $CHANGELOG
+
+    COPYRIGHT=$PKG/usr/share/doc/$PKGNAME/copyright
+    mkdir -p $(dirname $COPYRIGHT)
+    echo 'Copyright (C) 2016-2021 Texas Instruments Incorporated - https://www.ti.com' > $COPYRIGHT
+
+    (cd $PKG; find . -type f | grep -v /DEBIAN | xargs md5sum) > $PKG/DEBIAN/md5sums
+
+    fakeroot dpkg-deb --build $PKG
+
+    DEBPKG=${PKGNAME}_${VERS}_${ARCH}.deb
+    DEB_OUT_DIR=${TI_BDEBSTRAP_HOME:-${topdir}/ti-bdebstrap}
+    mkdir -p "$DEB_OUT_DIR"
+    DST=${DEB_OUT_DIR}/$DEBPKG
+    mv -f $PKG.deb $DST
+    echo "I: $0: Made $(realpath $DST) from ${tfa_release_dir} and ${optee_core_dir}"
+
+    rm -rf "$PKG"
+}
+
+export topdir="${NEXUS_ROOT:-$(git rev-parse --show-toplevel)}"
 
 # Parse args
 ARGS=$(getopt --options='' --longoptions=repo:,ubootonly --name "$0" -- "$@") || exit 1
@@ -283,6 +546,7 @@ do
     fi
 
     bsp_version=($(read_bsp_config ${distro} bsp_version))
+    platform=($(read_machine_config ${machine} atf_target_board ${bsp_version}))
 
     export host_arch=`uname -m`
     export native_build=false
@@ -307,14 +571,59 @@ do
 
     uboot=${topdir}/build/${distro}/tisdk-debian-${distro}-${bsp_version}-boot
     ubootfile=$uboot/u-boot.img
-    if [ -f $ubootfile ]; then
-        echo "I: $0: skipping build_bsp since $ubootfile present"
-    else
-        rm -rf $uboot
+
+    # Build BSP when either u-boot payload or OP-TEE runtime/asset inputs are missing.
+    # This guarantees --ubootonly can emit BOTH:
+    #   - u-boot_<ver>_<arch>.deb
+    #   - optee-tpm-assets_<ver>_all.deb
+    optee_dir=${topdir}/build/${distro}/bsp_sources/optee_os
+    rt_rootfs=${topdir}/build/${distro}/tisdk-debian-${distro}-${bsp_version}-rootfs
+    ta_glob=${optee_dir}/out/arm-plat-k3/export-ta_arm64/ta/*.ta
+    rules_glob=${optee_dir}/optee_client/tee-supplicant/*.rules
+    rules_tpl_glob=${optee_dir}/optee_client/tee-supplicant/*.rules.in
+    supp_bin_rootfs=${rt_rootfs}/usr/sbin/tee-supplicant
+    supp_bin_src=${optee_dir}/optee_client/tee-supplicant/tee-supplicant
+    supp_unit_rootfs=${rt_rootfs}/usr/lib/systemd/system/tee-supplicant@.service
+    supp_unit_src=${optee_dir}/optee_client/tee-supplicant/tee-supplicant@.service
+    bl31_file=${topdir}/build/${distro}/bsp_sources/trusted-firmware-a/build/k3/${platform}/release/bl31.bin
+    tee_pager_file=${optee_dir}/out/arm-plat-k3/core/tee-pager_v2.bin
+
+    need_bsp_build=0
+    if [ ! -f "$ubootfile" ]; then
+        need_bsp_build=1
+        echo "I: $0: build_bsp required - missing $ubootfile"
+    fi
+    if ! compgen -G "$ta_glob" > /dev/null; then
+        need_bsp_build=1
+        echo "I: $0: build_bsp required - missing TPM TA artifacts ($ta_glob)"
+    fi
+    if ! compgen -G "$rules_glob" > /dev/null && ! compgen -G "$rules_tpl_glob" > /dev/null; then
+        need_bsp_build=1
+        echo "I: $0: build_bsp required - missing tee-supplicant rules ($rules_glob or $rules_tpl_glob)"
+    fi
+    if [ ! -f "$supp_bin_rootfs" ] && [ ! -f "$supp_bin_src" ]; then
+        need_bsp_build=1
+        echo "I: $0: build_bsp required - missing tee-supplicant binary"
+    fi
+    if [ ! -f "$supp_unit_rootfs" ] && [ ! -f "$supp_unit_src" ]; then
+        need_bsp_build=1
+        echo "I: $0: build_bsp required - missing tee-supplicant service unit"
+    fi
+    if [ ! -f "$bl31_file" ] || [ ! -f "$tee_pager_file" ]; then
+        need_bsp_build=1
+        echo "I: $0: build_bsp required - missing secure binaries (bl31/tee-pager)"
+    fi
+
+    if [ "$need_bsp_build" -eq 1 ]; then
+        rm -rf "$uboot"
         echo "I: $0: running build_bsp ${distro} ${machine} ${bsp_version}"
         build_bsp ${distro} ${machine} ${bsp_version}
+    else
+        echo "I: $0: skipping build_bsp - uboot and TPM asset inputs already present"
     fi
     mkdeb $uboot
+    mkdeb_tpm_assets
+    mkdeb_optee_binaries
 
     if [ "$ubootonly" = 1 ]; then
         echo "I: $0: skipping package_and_clean because of --ubootonly"
@@ -331,4 +640,3 @@ do
     fi
 
 done
-

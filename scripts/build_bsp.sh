@@ -1,9 +1,9 @@
 #!/bin/bash
 
-ROOT_DIR=$(dirname $(dirname $0))
+ROOT_DIR=$(dirname "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")
 DEFS_FILE=".defs.mk"
 
-. ${ROOT_DIR}/${DEFS_FILE}
+. "${ROOT_DIR}/${DEFS_FILE}"
 if [ "$BUILDTYPE" = "bookworm-am64xx-evm" ]; then
     ARM_A_CORE=a53
 elif [ "$BUILDTYPE" = "bookworm-j7200-evm" ]; then
@@ -216,13 +216,20 @@ bsp_version=$2
 # working REE_FS only      CFG_RPMB_FS=n CFG_REE_FS=y CFG_TEE_CORE_LOG_LEVEL=3 ta-targets=ta_arm64 ${make_args[*]} &>>"${LOG_FILE}"
 # working RPMB only        CFG_RPMB_FS=y CFG_REE_FS=n CFG_RPMB_TESTKEY=y CFG_RPMB_WRITE_KEY=y CFG_TEE_CORE_LOG_LEVEL=3 ta-targets=ta_arm64 ${make_args[*]} &>>"${LOG_FILE}"
 
-# PERLE added
-    log "> optee_ftpm: copying TA files to rootfs"
-    mkdir -p ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/usr/lib/firmware/optee &>> ${LOG_FILE}
-    cp ${OPTEE_DIR}/out/arm-plat-k3/export-ta_arm64/ta/*.ta ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/usr/lib/firmware/optee/ &>> ${LOG_FILE}
-    mkdir -p ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/udev/rules.d &>> ${LOG_FILE}
-    cp ${OPTEE_DIR}/optee_client/tee-supplicant/*.rules ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/udev/rules.d/ &>> ${LOG_FILE}
-    sudo cp ${topdir}/updates/openssl.cnf ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/ssl/openssl.cnf &>> ${LOG_FILE}
+    # Legacy direct rootfs injection of TPM/OP-TEE assets.
+    # Default OFF: artifacts are expected to be delivered via Debian packages
+    # (e.g. optee-tpm-assets) and later injected through vyos-build.
+    # Set LEGACY_TPM_ROOTFS_COPY=1 to restore historical copy behavior.
+    if [[ "${LEGACY_TPM_ROOTFS_COPY,,}" =~ ^(1|true|yes|y)$ ]]; then
+        log "> optee_ftpm: LEGACY_TPM_ROOTFS_COPY enabled - copying TA/rules/openssl to rootfs"
+        mkdir -p ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/usr/lib/firmware/optee &>> ${LOG_FILE}
+        cp ${OPTEE_DIR}/out/arm-plat-k3/export-ta_arm64/ta/*.ta ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/usr/lib/firmware/optee/ &>> ${LOG_FILE}
+        mkdir -p ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/udev/rules.d &>> ${LOG_FILE}
+        cp ${OPTEE_DIR}/optee_client/tee-supplicant/*.rules ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/udev/rules.d/ &>> ${LOG_FILE}
+        sudo cp ${topdir}/updates/openssl.cnf ${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-rootfs/etc/ssl/openssl.cnf &>> ${LOG_FILE}
+    else
+        log "> optee_ftpm: skipping legacy rootfs copy (LEGACY_TPM_ROOTFS_COPY not enabled)"
+    fi
 }
 
 function build_uboot() {
@@ -252,6 +259,7 @@ bsp_version=$2
     make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} BL31=${TFA_DIR}/build/k3/${platform}/release/bl31.bin TEE=${OPTEE_DIR}/out/arm-plat-k3/core/tee-pager_v2.bin BINMAN_INDIRS=${FW_DIR} O=${UBOOT_DIR}/out/${ARM_A_CORE} &>>"${LOG_FILE}"
     cp ${UBOOT_DIR}/out/${ARM_A_CORE}/tispl.bin ${OUTDIR}/ &>> ${LOG_FILE}
     cp ${UBOOT_DIR}/out/${ARM_A_CORE}/u-boot.img ${OUTDIR}/ &>> ${LOG_FILE}
+    copy_secure_boot_artifacts ${OUTDIR} ${platform}
 
 	case ${machine} in
 		am62pxx-evm | am62xx-evm | am62xx-lp-evm | am62xxsip-evm)
@@ -301,6 +309,7 @@ bsp_version=$2
         make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} BL31=${TFA_DIR}/build/k3/${platform}/release/bl31.bin TEE=${OPTEE_DIR}/out/arm-plat-k3/core/tee-pager_v2.bin BINMAN_INDIRS=${FW_DIR} O=${UBOOT_DIR}/out/${ARM_A_CORE} &>>"${LOG_FILE}"
         cp ${UBOOT_DIR}/out/${ARM_A_CORE}/tispl.bin ${OUTDIR}/ &>> ${LOG_FILE}
         cp ${UBOOT_DIR}/out/${ARM_A_CORE}/u-boot.img ${OUTDIR}/ &>> ${LOG_FILE}
+        copy_secure_boot_artifacts ${OUTDIR} ${platform}
 
         # restore original env file, if debugging.  Normally, the entire bsp_sources are removed
         cp ${ENV_PATH}/${ENV_NAME}.env.orig ${ENV_PATH}/${ENV_NAME}.env
@@ -308,3 +317,27 @@ bsp_version=$2
     esac
 }
 
+function copy_secure_boot_artifacts() {
+outdir=$1
+platform=$2
+
+    local tfa_release_dir="${TFA_DIR}/build/k3/${platform}/release"
+    local optee_core_dir="${OPTEE_DIR}/out/arm-plat-k3/core"
+
+    # Export standalone secure-boot artifacts in addition to tispl.bin.
+    # These are useful for debugging/verification and downstream packaging.
+    for src in \
+        "${tfa_release_dir}/bl31.bin" \
+        "${optee_core_dir}/tee.bin" \
+        "${optee_core_dir}/tee-raw.bin" \
+        "${optee_core_dir}/tee-pager_v2.bin" \
+        "${optee_core_dir}/tee-pageable_v2.bin" \
+        "${optee_core_dir}/tee-header_v2.bin"
+    do
+        if [ -f "${src}" ]; then
+            cp "${src}" "${outdir}/" &>> "${LOG_FILE}"
+        else
+            log "> warning: missing secure artifact ${src}"
+        fi
+    done
+}

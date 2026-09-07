@@ -37,7 +37,11 @@ bsp_version=$2
     tar --use-compress-program="pigz --best --recursive | pv" -cf tisdk-debian-${distro}-${bsp_version}-boot.tar.xz tisdk-debian-${distro}-${bsp_version}-boot &>>"${LOG_FILE}"
     rm -rf tisdk-debian-${distro}-${bsp_version}-boot
 
-    rm -rf bsp_sources
+    if [[ "${KEEP_BSP_SOURCES,,}" =~ ^(1|true|yes|y)$ ]]; then
+        log "> Keeping bsp_sources (KEEP_BSP_SOURCES=${KEEP_BSP_SOURCES})"
+    else
+        rm -rf bsp_sources
+    fi
 
     cd ${topdir}/build/
 

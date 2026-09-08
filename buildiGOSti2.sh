@@ -340,6 +340,16 @@ function mkdeb_tpm_assets() {
     cp -p "$supp_bin" "$PKG/usr/sbin/tee-supplicant"
     cp -p "$supp_unit" "$PKG/usr/lib/systemd/system/tee-supplicant@.service"
 
+    # fTPM module-load policy ships from optee_client (co-located with the
+    # tee-supplicant service + udev rules). Package it into /etc/modprobe.d so
+    # tpm_ftpm_tee is not autoloaded before tee-supplicant serves the fTPM TA.
+    if [ -f "${rules_src_dir}/tpm_ftpm_tee.conf" ]; then
+        mkdir -p "$PKG/etc/modprobe.d"
+        cp -p "${rules_src_dir}/tpm_ftpm_tee.conf" "$PKG/etc/modprobe.d/"
+    else
+        echo "W: $0: ${rules_src_dir}/tpm_ftpm_tee.conf not found; fTPM autoload blacklist NOT packaged (update optee_client psl-master)" >&2
+    fi
+
     mkdir -p "$PKG/usr/lib/pkgconfig"
     cp -p "$teec_lib" "$PKG/usr/lib/libteec.a"
     cp -p "$teec_pc" "$PKG/usr/lib/pkgconfig/teec.pc"

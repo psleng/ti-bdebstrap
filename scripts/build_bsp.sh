@@ -77,7 +77,8 @@ bsp_version=$3
         git clone https://github.com/psleng/optee_client.git &>>"${LOG_FILE}"
 
         cd optee_client
-        git checkout ${client_srcrev} &>>"${LOG_FILE}"
+        # git checkout ${client_srcrev} &>>"${LOG_FILE}"   # psleng default (psl-master)
+        git checkout optee_client-jf &>>"${LOG_FILE}"      # JF test branch
         log ">> optee_client: cloned"
     else
         log ">> optee_client: already available"

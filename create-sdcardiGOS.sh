@@ -748,6 +748,9 @@ else
     echo "Copying flat rootfs System partition"
     # rsync -aHAX $ROOTFSPATH $PATH_TO_SDROOTFS
     unsquashfs -d $PATH_TO_SDROOTFS $ROOTFILEPATH
+    # cluge to move dtb from /boot/dtb to expected /boot/dtb/ti
+    mkdir -p $PATH_TO_SDROOTFS/boot/dtb/ti
+    cp $PATH_TO_SDROOTFS/boot/dtb/* $PATH_TO_SDROOTFS/boot/dtb/ti
 fi
 
 echo ""

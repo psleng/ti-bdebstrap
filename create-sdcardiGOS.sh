@@ -730,6 +730,18 @@ if [ "$fstype" = "squashfs" ] ; then
     sudo mkdir -p "$PATH_TO_TMP_DIR/vyos-iso"
     sudo mount -o ro "$ISO_LOOP" "$PATH_TO_TMP_DIR/vyos-iso"
     sudo cp -a "$PATH_TO_TMP_DIR/vyos-iso/." "$PATH_TO_SDROOTFS"
+
+    # Make U-Boot auto-launch GRUB with no uEnv.txt: the built-in distro scan
+    # probes the *bootable* partition (p1, FAT) of each mmc for efi/boot/bootaa64.efi.
+    # Stage the full GRUB EFI there under the removable-media name (direct GRUB, no
+    # shim -- matches the proven "bootefi grubaa64.efi" path), plus a tiny redirect
+    # grub.cfg that repoints $root at whichever partition holds the live filesystem
+    # (p2) and hands off to the real config copied from the ISO.
+    sudo mkdir -p "$PATH_TO_SDBOOT/EFI/BOOT" "$PATH_TO_SDBOOT/boot/grub"
+    sudo cp "$PATH_TO_TMP_DIR/vyos-iso/EFI/boot/grubaa64.efi" "$PATH_TO_SDBOOT/EFI/BOOT/BOOTAA64.EFI"
+    printf 'search --no-floppy --set=root --file /live/filesystem.squashfs\nconfigfile /boot/grub/grub.cfg\n' \
+        | sudo tee "$PATH_TO_SDBOOT/boot/grub/grub.cfg" >/dev/null
+
     sudo umount "$PATH_TO_TMP_DIR/vyos-iso"
     sudo losetup -d "$ISO_LOOP"
 else

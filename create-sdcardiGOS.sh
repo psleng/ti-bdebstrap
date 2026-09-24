@@ -731,16 +731,28 @@ if [ "$fstype" = "squashfs" ] ; then
     sudo mount -o ro "$ISO_LOOP" "$PATH_TO_TMP_DIR/vyos-iso"
     sudo cp -a "$PATH_TO_TMP_DIR/vyos-iso/." "$PATH_TO_SDROOTFS"
 
-    # Make U-Boot auto-launch GRUB with no uEnv.txt: the built-in distro scan
-    # probes the *bootable* partition (p1, FAT) of each mmc for efi/boot/bootaa64.efi.
-    # Stage the full GRUB EFI there under the removable-media name (direct GRUB, no
-    # shim -- matches the proven "bootefi grubaa64.efi" path), plus a tiny redirect
-    # grub.cfg that repoints $root at whichever partition holds the live filesystem
-    # (p2) and hands off to the real config copied from the ISO.
-    sudo mkdir -p "$PATH_TO_SDBOOT/EFI/BOOT" "$PATH_TO_SDBOOT/boot/grub"
-    sudo cp "$PATH_TO_TMP_DIR/vyos-iso/EFI/boot/grubaa64.efi" "$PATH_TO_SDBOOT/EFI/BOOT/BOOTAA64.EFI"
-    printf 'search --no-floppy --set=root --file /live/filesystem.squashfs\nconfigfile /boot/grub/grub.cfg\n' \
-        | sudo tee "$PATH_TO_SDBOOT/boot/grub/grub.cfg" >/dev/null
+    # Auto-boot the SD via U-Boot's envboot (uEnv.txt) instead of the distro scan.
+    # The scan probes mmc0 (eMMC) before mmc1 (SD), so a populated eMMC wins; and
+    # it launches GRUB with U-Boot's stock control FDT (main_uart0 = ttyS2) while
+    # the image cmdline is console=ttyS0 -> dead serial console. envboot runs
+    # uenvcmd before distro_bootcmd, and by loading the per-target iGOS dtb below
+    # (main_uart0 = ttyS0) the existing console=ttyS0 works with no image change.
+    #
+    # dtb name = whatever this flavor's vyos-build ISO staged into /boot/dtb
+    # (am64x-evm -> k3-am642-evm.dtb, j7200-evm -> k3-j7200-evm.dtb). Stage a copy
+    # under ti/ to match the uEnv load path.
+    DTB_NAME=$(basename "$(ls "$PATH_TO_SDROOTFS"/boot/dtb/*.dtb 2>/dev/null | head -n1)")
+    if [ -z "$DTB_NAME" ]; then
+        echo "Error: no dtb found under $PATH_TO_SDROOTFS/boot/dtb"
+        exit 1
+    fi
+    sudo mkdir -p "$PATH_TO_SDROOTFS/boot/dtb/ti"
+    sudo cp "$PATH_TO_SDROOTFS/boot/dtb/$DTB_NAME" "$PATH_TO_SDROOTFS/boot/dtb/ti/$DTB_NAME"
+    # uEnv.txt must live on the FAT boot partition (loadbootenv uses fatload); grub
+    # + dtb load from the ext rootfs (mmc 1:2). Single quotes keep ${...} literal
+    # for U-Boot to expand at boot; %s is the dtb basename.
+    printf 'uenvcmd=load mmc 1:2 ${kernel_addr_r} /EFI/boot/grubaa64.efi; load mmc 1:2 ${fdt_addr_r} /boot/dtb/ti/%s; bootefi ${kernel_addr_r} ${fdt_addr_r}\n' \
+        "$DTB_NAME" | sudo tee "$PATH_TO_SDBOOT/uEnv.txt" >/dev/null
 
     sudo umount "$PATH_TO_TMP_DIR/vyos-iso"
     sudo losetup -d "$ISO_LOOP"

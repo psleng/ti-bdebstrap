@@ -257,6 +257,21 @@ bsp_version=$2
     cd ${UBOOT_DIR}
     log "> uboot-${ARM_A_CORE}: building .."
     make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} ${uboot_acore_defconfig} O=${UBOOT_DIR}/out/${ARM_A_CORE} &>>"${LOG_FILE}"
+
+    # Opt-in UEFI Secure Boot: nexus-build sets UBOOTEFI_VAR to the preseed store
+    # (from sbkeys) for a secure build. Absent => plain non-secure U-Boot (setup
+    # mode), which still boots signed or unsigned GRUB. Enabled here (not in the
+    # defconfig) so the non-secure build stays the default.
+    if [ -n "${UBOOTEFI_VAR:-}" ] && [ -f "${UBOOTEFI_VAR}" ]; then
+        log "> uboot-${ARM_A_CORE}: UEFI Secure Boot ON (preseed ${UBOOTEFI_VAR})"
+        cp "${UBOOTEFI_VAR}" ${UBOOT_DIR}/ubootefi.var &>> ${LOG_FILE}
+        ${UBOOT_DIR}/scripts/config --file ${UBOOT_DIR}/out/${ARM_A_CORE}/.config \
+            --enable CONFIG_EFI_SECURE_BOOT --enable CONFIG_EFI_VARIABLES_PRESEED &>> ${LOG_FILE}
+        make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} O=${UBOOT_DIR}/out/${ARM_A_CORE} olddefconfig &>>"${LOG_FILE}"
+    else
+        rm -f ${UBOOT_DIR}/ubootefi.var
+        log "> uboot-${ARM_A_CORE}: UEFI Secure Boot OFF (no UBOOTEFI_VAR) -- non-secure build"
+    fi
     make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} BL31=${TFA_DIR}/build/k3/${platform}/release/bl31.bin TEE=${OPTEE_DIR}/out/arm-plat-k3/core/tee-pager_v2.bin BINMAN_INDIRS=${FW_DIR} O=${UBOOT_DIR}/out/${ARM_A_CORE} &>>"${LOG_FILE}"
     cp ${UBOOT_DIR}/out/${ARM_A_CORE}/tispl.bin ${OUTDIR}/ &>> ${LOG_FILE}
     cp ${UBOOT_DIR}/out/${ARM_A_CORE}/u-boot.img ${OUTDIR}/ &>> ${LOG_FILE}

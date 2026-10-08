@@ -265,6 +265,30 @@ bsp_version=$2
     if [ -n "${UBOOTEFI_VAR:-}" ] && [ -f "${UBOOTEFI_VAR}" ]; then
         log "> uboot-${ARM_A_CORE}: UEFI Secure Boot ON (preseed ${UBOOTEFI_VAR})"
         cp "${UBOOTEFI_VAR}" ${UBOOT_DIR}/ubootefi.var &>> ${LOG_FILE}
+
+        # Secure boot must not source the mutable uEnv.txt on the FAT ESP: its
+        # uenvcmd runs arbitrary U-Boot commands and would bypass the signed
+        # bootefi/GRUB chain. Bake the factory-reset probe and the GRUB launch
+        # into the signed default env (igos.env) and point bootcmd at it instead
+        # of "run envboot" (which loads uEnv.txt). env is ENV_IS_NOWHERE, so the
+        # baked value is authoritative and cannot be overridden at runtime.
+        IGOS_ENV="${UBOOT_DIR}/board/perle/igos/igos.env"
+        if [ -f "${IGOS_ENV}" ]; then
+            if ! grep -q '^securebootcmd=' "${IGOS_ENV}"; then
+                log "> uboot-${ARM_A_CORE}: baking secure bootcmd into igos.env (drops uEnv.txt)"
+                cat >> "${IGOS_ENV}" <<'IGOS_SECURE_ENV'
+
+scratch_addr=0x82000000
+test_reset=setexpr next_addr ${scratch_addr} + 4; gpio read buttonval 123; if test $buttonval -eq 1; then setenv second_half 0x0a303d74; else setenv second_half 0x0a313d74; fi; mw.l ${scratch_addr} 0x65736572 1; mw.l ${next_addr} ${second_half} 1; fatwrite mmc 0:2 ${scratch_addr} /RESET.ENV 8
+securebootcmd=run test_reset; load mmc 0:2 ${kernel_addr_r} /EFI/VyOS/grubaa64.efi; bootefi ${kernel_addr_r}
+IGOS_SECURE_ENV
+            fi
+            ${UBOOT_DIR}/scripts/config --file ${UBOOT_DIR}/out/${ARM_A_CORE}/.config \
+                --set-str CONFIG_BOOTCOMMAND "run securebootcmd" &>> ${LOG_FILE}
+        else
+            log "> uboot-${ARM_A_CORE}: WARNING ${IGOS_ENV} absent -- secure bootcmd NOT baked; uEnv.txt still active"
+        fi
+
         ${UBOOT_DIR}/scripts/config --file ${UBOOT_DIR}/out/${ARM_A_CORE}/.config \
             --enable CONFIG_EFI_SECURE_BOOT --enable CONFIG_EFI_VARIABLES_PRESEED &>> ${LOG_FILE}
         make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} O=${UBOOT_DIR}/out/${ARM_A_CORE} olddefconfig &>>"${LOG_FILE}"

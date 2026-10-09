@@ -1,22 +1,22 @@
 --- a/board/perle/igos/igos.c
 +++ b/board/perle/igos/igos.c
-@@ -39,10 +39,13 @@
+@@ -39,10 +39,14 @@
  #define PERLE_WIFI_MAC_ADDR_CNT	2
  #define PERLE_ETH_MAC_ADDR_CNT	9
  
-+#define PERLE_VERSION_LEN		4
++#define PERLE_DTB_VARIANT_LEN	2
 +#define PERLE_BOARD_REV_LEN		8
 +
  struct perle_am_eeprom {
  	uint32_t magic;
--	uint16_t version;
+ 	uint16_t version;
 -	uint8_t reserved1[10];
-+	char version[PERLE_VERSION_LEN];
++	char dtb_variant[PERLE_DTB_VARIANT_LEN];
 +	char board_revision[PERLE_BOARD_REV_LEN];
  	char serial[PERLE_SERIAL_LEN];
  	char prod_id[PERLE_PROD_ID_LEN];
  	char model[PERLE_MODEL_LEN];
-@@ -117,30 +120,11 @@
+@@ -117,30 +121,11 @@
  	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
  
  	if (ep->magic == PERLE_EEP_HDR_MAGIC) {
@@ -24,9 +24,8 @@
 -
  		printf("== EEPROM data ====================================\n");
  		printf("MAGIC        : 0x%08X\n", ep->magic);
--		printf("VERSION      : 0x%04X\n", ep->version);
+ 		printf("VERSION      : 0x%04X\n", ep->version);
 -		printf("SERIAL       : %.*s\n", PERLE_SERIAL_LEN, ep->serial);
-+		printf("VERSION      : %.*s\n", (int)sizeof(ep->version), ep->version);
  		printf("PROD_ID      : %.*s\n", PERLE_PROD_ID_LEN, ep->prod_id);
  		printf("MODEL        : %.*s\n", PERLE_MODEL_LEN, ep->model);
 -		printf("SSID         : %.*s\n", PERLE_SSID_LEN, ep->ssid);
@@ -48,21 +47,36 @@
  		printf("===================================================\n");
  	} else {
  		printf("ERROR: ## EEPROM data is not valid!\n");
-@@ -282,7 +266,7 @@
+@@ -282,7 +267,7 @@
  	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
  
  	if (!do_board_detect()) {
 -		printf("Ver %x, Model: %s-%s\n", ep->version, ep->prod_id, ep->model);
-+		printf("Version %.*s, Model: %s-%s\n", (int)sizeof(ep->version), ep->version, ep->prod_id, ep->model);
++		printf("Version %x, Model: %s-%s\n", ep->version, ep->prod_id, ep->model);
  	}
  
  	return 0;
-@@ -325,7 +309,7 @@
-     }
+@@ -317,6 +302,7 @@
+ {
+     struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
+     int len = 0;
++    int i;
  
+     /* Ensure EEPROM data is valid */
+     if (do_board_detect() != 0) {
+@@ -327,7 +313,14 @@
      /* Identity fields consumed by GRUB (version/product/model) */
--    len += snprintf(buf + len, buf_size - len, "version=%04x\n", ep->version);
-+    len += snprintf(buf + len, buf_size - len, "version=%.*s\n", (int)sizeof(ep->version), ep->version);
+     len += snprintf(buf + len, buf_size - len, "version=%04x\n", ep->version);
      len += snprintf(buf + len, buf_size - len, "prod_id=%.*s\n", PERLE_PROD_ID_LEN, ep->prod_id);
-     len += snprintf(buf + len, buf_size - len, "model=%.*s\n", PERLE_MODEL_LEN, ep->model);
+-    len += snprintf(buf + len, buf_size - len, "model=%.*s\n", PERLE_MODEL_LEN, ep->model);
++    /* model + ASCII-alnum DTB-variant suffix (EEPROM 0x06); non-ASCII -> base model */
++    len += snprintf(buf + len, buf_size - len, "model=%.*s", PERLE_MODEL_LEN, ep->model);
++    for (i = 0; i < (int)sizeof(ep->dtb_variant); i++) {
++        char c = ep->dtb_variant[i];
++        if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
++            len += snprintf(buf + len, buf_size - len, "%c", c);
++    }
++    len += snprintf(buf + len, buf_size - len, "\n");
  
+     return len;
+ }

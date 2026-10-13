@@ -246,6 +246,30 @@ bsp_version=$2
 
     cd ${UBOOT_DIR}
 
+    # Opt-in TI K3 boot-signing key (iGOS only): stage UBOOT_SIGN_KEY_DIR/custMpk.pem
+    # so binman signs tiboot3/tispl/u-boot.img with the production MPK (hash burned
+    # via keywriter). Absent => committed TI dummy key (HS-FS/dev). The real private
+    # key is never committed; provision it like nexus-build sbkeys (clone fresh, wipe).
+    if [ "$BUILDTYPE" = "bookworm-am64xx-igos" ]; then
+        local igos_keys="${UBOOT_DIR}/board/perle/keys"
+        # Preserve the pristine committed key once so reused bsp_sources can revert.
+        if [ -f "${igos_keys}/custMpk.pem" ] && [ ! -f "${igos_keys}/custMpk.pem.committed" ]; then
+            cp "${igos_keys}/custMpk.pem" "${igos_keys}/custMpk.pem.committed" &>> ${LOG_FILE}
+        fi
+        if [ -n "${UBOOT_SIGN_KEY_DIR:-}" ] && [ -f "${UBOOT_SIGN_KEY_DIR}/custMpk.pem" ]; then
+            log "> uboot: TI secure signing with external key ${UBOOT_SIGN_KEY_DIR}/custMpk.pem"
+            cp "${UBOOT_SIGN_KEY_DIR}/custMpk.pem" "${igos_keys}/custMpk.pem" &>> ${LOG_FILE}
+            [ -f "${UBOOT_SIGN_KEY_DIR}/custMpk.key" ] && cp "${UBOOT_SIGN_KEY_DIR}/custMpk.key" "${igos_keys}/custMpk.key" &>> ${LOG_FILE}
+            [ -f "${UBOOT_SIGN_KEY_DIR}/custMpk.crt" ] && cp "${UBOOT_SIGN_KEY_DIR}/custMpk.crt" "${igos_keys}/custMpk.crt" &>> ${LOG_FILE}
+        elif [ -n "${UBOOT_SIGN_KEY_DIR:-}" ]; then
+            echo "=== E: $0: UBOOT_SIGN_KEY_DIR set but ${UBOOT_SIGN_KEY_DIR}/custMpk.pem missing" >&2
+            exit 1
+        else
+            log "> uboot: TI secure signing with committed TI dummy key (set UBOOT_SIGN_KEY_DIR for production)"
+            cp "${igos_keys}/custMpk.pem.committed" "${igos_keys}/custMpk.pem" &>> ${LOG_FILE}
+        fi
+    fi
+
     # set output for normal build
     OUTDIR="${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-boot"
 

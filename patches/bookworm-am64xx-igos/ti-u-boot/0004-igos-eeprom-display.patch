@@ -1,0 +1,24 @@
+--- a/board/perle/igos/igos.c
++++ b/board/perle/igos/igos.c
+@@ -124,6 +124,7 @@ static void dump_eeprom(void)
+ 		printf("== EEPROM data ====================================\n");
+ 		printf("MAGIC        : 0x%08X\n", ep->magic);
+ 		printf("VERSION      : 0x%04X\n", ep->version);
++		printf("DTB_VARIANT  : 0x%02X 0x%02X\n", (unsigned char)ep->dtb_variant[0], (unsigned char)ep->dtb_variant[1]);
+ 		printf("PROD_ID      : %.*s\n", PERLE_PROD_ID_LEN, ep->prod_id);
+ 		printf("MODEL        : %.*s\n", PERLE_MODEL_LEN, ep->model);
+ 		printf("===================================================\n");
+@@ -264,11 +265,8 @@ int do_board_detect(void)
+ 
+ int checkboard(void)
+ {
+-	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
+-
+-	if (!do_board_detect()) {
+-		printf("Version %x, Model: %s-%s\n", ep->version, ep->prod_id, ep->model);
+-	}
++	/* Triggers the EEPROM read + dump; board identity is shown there */
++	do_board_detect();
+ 
+ 	return 0;
+ }

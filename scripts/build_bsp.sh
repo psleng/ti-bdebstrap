@@ -246,6 +246,30 @@ bsp_version=$2
 
     cd ${UBOOT_DIR}
 
+    # Opt-in TI K3 boot-signing key (iGOS only): stage UBOOT_SIGN_KEY_DIR/custMpk.pem
+    # so binman signs tiboot3/tispl/u-boot.img with the production MPK (hash burned
+    # via keywriter). Absent => committed TI dummy key (HS-FS/dev). The real private
+    # key is never committed; provision it like nexus-build sbkeys (clone fresh, wipe).
+    if [ "$BUILDTYPE" = "bookworm-am64xx-igos" ]; then
+        local igos_keys="${UBOOT_DIR}/board/perle/keys"
+        # Preserve the pristine committed key once so reused bsp_sources can revert.
+        if [ -f "${igos_keys}/custMpk.pem" ] && [ ! -f "${igos_keys}/custMpk.pem.committed" ]; then
+            cp "${igos_keys}/custMpk.pem" "${igos_keys}/custMpk.pem.committed" &>> ${LOG_FILE}
+        fi
+        if [ -n "${UBOOT_SIGN_KEY_DIR:-}" ] && [ -f "${UBOOT_SIGN_KEY_DIR}/custMpk.pem" ]; then
+            log "> uboot: TI secure signing with external key ${UBOOT_SIGN_KEY_DIR}/custMpk.pem"
+            cp "${UBOOT_SIGN_KEY_DIR}/custMpk.pem" "${igos_keys}/custMpk.pem" &>> ${LOG_FILE}
+            [ -f "${UBOOT_SIGN_KEY_DIR}/custMpk.key" ] && cp "${UBOOT_SIGN_KEY_DIR}/custMpk.key" "${igos_keys}/custMpk.key" &>> ${LOG_FILE}
+            [ -f "${UBOOT_SIGN_KEY_DIR}/custMpk.crt" ] && cp "${UBOOT_SIGN_KEY_DIR}/custMpk.crt" "${igos_keys}/custMpk.crt" &>> ${LOG_FILE}
+        elif [ -n "${UBOOT_SIGN_KEY_DIR:-}" ]; then
+            echo "=== E: $0: UBOOT_SIGN_KEY_DIR set but ${UBOOT_SIGN_KEY_DIR}/custMpk.pem missing" >&2
+            exit 1
+        else
+            log "> uboot: TI secure signing with committed TI dummy key (set UBOOT_SIGN_KEY_DIR for production)"
+            cp "${igos_keys}/custMpk.pem.committed" "${igos_keys}/custMpk.pem" &>> ${LOG_FILE}
+        fi
+    fi
+
     # set output for normal build
     OUTDIR="${topdir}/build/${build}/tisdk-debian-${distro}-${bsp_version}-boot"
 
@@ -257,6 +281,45 @@ bsp_version=$2
     cd ${UBOOT_DIR}
     log "> uboot-${ARM_A_CORE}: building .."
     make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} ${uboot_acore_defconfig} O=${UBOOT_DIR}/out/${ARM_A_CORE} &>>"${LOG_FILE}"
+
+    # Opt-in UEFI Secure Boot: nexus-build sets UBOOTEFI_VAR to the preseed store
+    # (from sbkeys) for a secure build. Absent => plain non-secure U-Boot (setup
+    # mode), which still boots signed or unsigned GRUB. Enabled here (not in the
+    # defconfig) so the non-secure build stays the default.
+    if [ -n "${UBOOTEFI_VAR:-}" ] && [ -f "${UBOOTEFI_VAR}" ]; then
+        log "> uboot-${ARM_A_CORE}: UEFI Secure Boot ON (preseed ${UBOOTEFI_VAR})"
+        cp "${UBOOTEFI_VAR}" ${UBOOT_DIR}/ubootefi.var &>> ${LOG_FILE}
+
+        # Secure boot must not source the mutable uEnv.txt on the FAT ESP: its
+        # uenvcmd runs arbitrary U-Boot commands and would bypass the signed
+        # bootefi/GRUB chain. Bake the factory-reset probe and the GRUB launch
+        # into the signed default env (igos.env) and point bootcmd at it instead
+        # of "run envboot" (which loads uEnv.txt). env is ENV_IS_NOWHERE, so the
+        # baked value is authoritative and cannot be overridden at runtime.
+        IGOS_ENV="${UBOOT_DIR}/board/perle/igos/igos.env"
+        if [ -f "${IGOS_ENV}" ]; then
+            if ! grep -q '^securebootcmd=' "${IGOS_ENV}"; then
+                log "> uboot-${ARM_A_CORE}: baking secure bootcmd into igos.env (drops uEnv.txt)"
+                cat >> "${IGOS_ENV}" <<'IGOS_SECURE_ENV'
+
+scratch_addr=0x82000000
+test_reset=setexpr next_addr ${scratch_addr} + 4; gpio read buttonval 123; if test $buttonval -eq 1; then setenv second_half 0x0a303d74; else setenv second_half 0x0a313d74; fi; mw.l ${scratch_addr} 0x65736572 1; mw.l ${next_addr} ${second_half} 1; fatwrite mmc 0:2 ${scratch_addr} /RESET.ENV 8
+securebootcmd=run test_reset; load mmc 0:2 ${kernel_addr_r} /EFI/VyOS/grubaa64.efi; bootefi ${kernel_addr_r}
+IGOS_SECURE_ENV
+            fi
+            ${UBOOT_DIR}/scripts/config --file ${UBOOT_DIR}/out/${ARM_A_CORE}/.config \
+                --set-str CONFIG_BOOTCOMMAND "run securebootcmd" &>> ${LOG_FILE}
+        else
+            log "> uboot-${ARM_A_CORE}: WARNING ${IGOS_ENV} absent -- secure bootcmd NOT baked; uEnv.txt still active"
+        fi
+
+        ${UBOOT_DIR}/scripts/config --file ${UBOOT_DIR}/out/${ARM_A_CORE}/.config \
+            --enable CONFIG_EFI_SECURE_BOOT --enable CONFIG_EFI_VARIABLES_PRESEED &>> ${LOG_FILE}
+        make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} O=${UBOOT_DIR}/out/${ARM_A_CORE} olddefconfig &>>"${LOG_FILE}"
+    else
+        rm -f ${UBOOT_DIR}/ubootefi.var
+        log "> uboot-${ARM_A_CORE}: UEFI Secure Boot OFF (no UBOOTEFI_VAR) -- non-secure build"
+    fi
     make -j`nproc` ARCH=arm CROSS_COMPILE=${cross_compile} BL31=${TFA_DIR}/build/k3/${platform}/release/bl31.bin TEE=${OPTEE_DIR}/out/arm-plat-k3/core/tee-pager_v2.bin BINMAN_INDIRS=${FW_DIR} O=${UBOOT_DIR}/out/${ARM_A_CORE} &>>"${LOG_FILE}"
     cp ${UBOOT_DIR}/out/${ARM_A_CORE}/tispl.bin ${OUTDIR}/ &>> ${LOG_FILE}
     cp ${UBOOT_DIR}/out/${ARM_A_CORE}/u-boot.img ${OUTDIR}/ &>> ${LOG_FILE}

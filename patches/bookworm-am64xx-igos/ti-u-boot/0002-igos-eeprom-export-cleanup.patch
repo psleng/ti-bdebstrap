@@ -1,0 +1,86 @@
+diff --git a/board/perle/igos/igos.c b/board/perle/igos/igos.c
+index cf7415f..ab9325e 100644
+--- a/board/perle/igos/igos.c
++++ b/board/perle/igos/igos.c
+@@ -306,37 +306,6 @@ static void setup_board_eeprom_env(void)
+ 	env_set("board_name", board_name);
+ }
+ 
+-static void setup_serial(void)
+-{
+-	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
+-
+-	env_set("serial#", ep->serial);
+-}
+-
+-static void set_env_mac_addr(void)
+-{
+-	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
+-
+-	if (!do_board_detect()) {
+-		int i;
+-
+-		for (i = 0; i < PERLE_WIFI_MAC_ADDR_CNT; i++) {
+-			if (is_valid_ethaddr(ep->wifi_mac_addr[i])) {
+-				eth_env_set_enetaddr_by_index("wifi", i, ep->wifi_mac_addr[i]);
+-			} else {
+-				debug("Invalid wifi mac%d address (%pM)\n", i, ep->wifi_mac_addr[i]);
+-			}
+-		}
+-		for (i = 0; i < PERLE_ETH_MAC_ADDR_CNT; i++) {
+-			if (is_valid_ethaddr(ep->eth_mac_addr[i])) {
+-				eth_env_set_enetaddr_by_index("eth", i, ep->eth_mac_addr[i]);
+-			} else {
+-				debug("Invalid eth mac%d address (%pM)\n", i, ep->eth_mac_addr[i]);
+-			}
+-		}
+-	}
+-}
+-
+ /**
+  * generate_product_env_buf() - Build key=value text buffer from EEPROM data
+  * @buf: Target buffer to hold env file contents
+@@ -348,7 +317,6 @@ static int generate_product_env_buf(char *buf, size_t buf_size)
+ {
+     struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
+     int len = 0;
+-    int i;
+ 
+     /* Ensure EEPROM data is valid */
+     if (do_board_detect() != 0) {
+@@ -356,25 +324,10 @@ static int generate_product_env_buf(char *buf, size_t buf_size)
+         return -1;
+     }
+ 
+-    /* Standard product fields */
++    /* Identity fields consumed by GRUB (version/product/model) */
+     len += snprintf(buf + len, buf_size - len, "version=%04x\n", ep->version);
+-    len += snprintf(buf + len, buf_size - len, "serial=%.*s\n", PERLE_SERIAL_LEN, ep->serial);
+     len += snprintf(buf + len, buf_size - len, "prod_id=%.*s\n", PERLE_PROD_ID_LEN, ep->prod_id);
+     len += snprintf(buf + len, buf_size - len, "model=%.*s\n", PERLE_MODEL_LEN, ep->model);
+-    len += snprintf(buf + len, buf_size - len, "ssid=%.*s\n", PERLE_SSID_LEN, ep->ssid);
+-    len += snprintf(buf + len, buf_size - len, "password=%.*s\n", PERLE_PASSWORD_LEN, ep->password);
+-
+-    /* Wi-Fi MAC Addresses */
+-    for (i = 0; i < PERLE_WIFI_MAC_ADDR_CNT; i++) {
+-        len += snprintf(buf + len, buf_size - len, "wifi_mac%d=%pM\n",
+-                        i, ep->wifi_mac_addr[i]);
+-    }
+-
+-    /* Ethernet MAC Addresses */
+-    for (i = 0; i < PERLE_ETH_MAC_ADDR_CNT; i++) {
+-        len += snprintf(buf + len, buf_size - len, "eth_mac%d=%pM\n",
+-                        i, ep->eth_mac_addr[i]);
+-    }
+ 
+     return len;
+ }
+@@ -423,8 +376,6 @@ int board_late_init(void)
+ {
+ 	if (IS_ENABLED(CONFIG_PERLE_I2C_BOARD_DETECT)) {
+ 		setup_board_eeprom_env();
+-		setup_serial();
+-		set_env_mac_addr();
+ 
+ 		/* Write PRODUCT.ENV to eMMC partition 0:2 */
+ 		write_product_env_file("mmc", "0:2", "PRODUCT.ENV");

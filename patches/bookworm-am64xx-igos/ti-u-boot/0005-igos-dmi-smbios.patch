@@ -37,7 +37,7 @@ diff --git a/arch/arm/dts/k3-am642-igos-u-boot.dtsi b/arch/arm/dts/k3-am642-igos
 +				manufacturer = "Perle Systems";
 +				product = "placeholder-system-product-padxxxxxxxxxxxxxxxxxxx";
 +				version = "0000xxxx";
-+				family = "iGOS";
++				family = "placeholder-system-family-padxxxxxxxxxxxxxxx";
 +				sku = "placeholder-sku-paddingx";
 +			};
 +
@@ -83,7 +83,7 @@ diff --git a/board/perle/igos/igos.c b/board/perle/igos/igos.c
  	uint8_t wifi_mac_addr[PERLE_WIFI_MAC_ADDR_CNT][PERLE_MAC_ADDR_LEN];
  	uint8_t eth_mac_addr[PERLE_ETH_MAC_ADDR_CNT][PERLE_MAC_ADDR_LEN];
  } __attribute__ ((__packed__));
-@@ -272,6 +276,104 @@
+@@ -272,6 +276,107 @@
  }
  
  #ifdef CONFIG_BOARD_LATE_INIT
@@ -173,6 +173,9 @@ diff --git a/board/perle/igos/igos.c b/board/perle/igos/igos.c
 +	perle_smbios_set(fdt, "/sysinfo/smbios/system", "product", product);
 +	if (sku[0])
 +		perle_smbios_set(fdt, "/sysinfo/smbios/system", "sku", sku);
++
++	/* Family reports the EEPROM product (prod_id + model) */
++	perle_smbios_set(fdt, "/sysinfo/smbios/system", "family", product);
 +
 +	perle_smbios_set(fdt, "/sysinfo/smbios/baseboard", "product", product);
 +

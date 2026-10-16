@@ -174,8 +174,8 @@ diff --git a/board/perle/igos/igos.c b/board/perle/igos/igos.c
 +	if (sku[0])
 +		perle_smbios_set(fdt, "/sysinfo/smbios/system", "sku", sku);
 +
-+	/* Family reports the EEPROM product (prod_id + model) */
-+	perle_smbios_set(fdt, "/sysinfo/smbios/system", "family", product);
++	/* Family reports the EEPROM product id only */
++	perle_smbios_set(fdt, "/sysinfo/smbios/system", "family", prod_id);
 +
 +	perle_smbios_set(fdt, "/sysinfo/smbios/baseboard", "product", product);
 +

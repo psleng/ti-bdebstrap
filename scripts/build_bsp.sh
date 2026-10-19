@@ -133,7 +133,7 @@ bsp_version=$3
         log ">> ti-u-boot: not found. cloning .."
         uboot_srcrev=($(read_bsp_config ${bsp_version} uboot_srcrev))
         git clone \
-            https://git.ti.com/git/ti-u-boot/ti-u-boot.git \
+            https://github.com/TexasInstruments/ti-u-boot.git \
             -b ${uboot_srcrev} \
             --single-branch \
             --depth=1 &>>"${LOG_FILE}"
@@ -154,7 +154,7 @@ bsp_version=$3
         log ">> ti-linux-firmware: not found. cloning .."
         linux_fw_srcrev=($(read_bsp_config ${bsp_version} linux_fw_srcrev))
         git clone \
-            https://git.ti.com/git/processor-firmware/ti-linux-firmware.git \
+            https://github.com/TexasInstruments/ti-linux-firmware.git \
             -b ${linux_fw_srcrev} \
             --single-branch \
             --depth=1 &>>"${LOG_FILE}"

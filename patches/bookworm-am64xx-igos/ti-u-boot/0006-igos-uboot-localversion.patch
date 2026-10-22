@@ -1,0 +1,17 @@
+diff --git a/configs/am64x_igos_a53_defconfig b/configs/am64x_igos_a53_defconfig
+--- a/configs/am64x_igos_a53_defconfig
++++ b/configs/am64x_igos_a53_defconfig
+@@ -286,8 +286,8 @@
+ #
+ # General setup
+ #
+-CONFIG_LOCALVERSION=""
+-CONFIG_LOCALVERSION_AUTO=y
++CONFIG_LOCALVERSION="-igos-1.0"
++# CONFIG_LOCALVERSION_AUTO is not set
+ CONFIG_CC_IS_GCC=y
+ CONFIG_GCC_VERSION=120200
+ CONFIG_CLANG_VERSION=0
+diff --git a/.scmversion b/.scmversion
+new file mode 100644
+index 00000000..e69de29b

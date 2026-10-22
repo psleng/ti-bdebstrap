@@ -1,0 +1,32 @@
+diff --git a/lib/smbios.c b/lib/smbios.c
+--- a/lib/smbios.c
++++ b/lib/smbios.c
+@@ -245,16 +245,8 @@ static int smbios_write_type0(ulong *current, int handle,
+ #ifdef CONFIG_ROM_SIZE
+ 	t->bios_rom_size = (CONFIG_ROM_SIZE / 65536) - 1;
+ #endif
+-	t->bios_characteristics = BIOS_CHARACTERISTICS_PCI_SUPPORTED |
+-				  BIOS_CHARACTERISTICS_SELECTABLE_BOOT |
+-				  BIOS_CHARACTERISTICS_UPGRADEABLE;
+-#ifdef CONFIG_GENERATE_ACPI_TABLE
+-	t->bios_characteristics_ext1 = BIOS_CHARACTERISTICS_EXT1_ACPI;
+-#endif
+-#ifdef CONFIG_EFI_LOADER
+-	t->bios_characteristics_ext2 |= BIOS_CHARACTERISTICS_EXT2_UEFI;
+-#endif
+-	t->bios_characteristics_ext2 |= BIOS_CHARACTERISTICS_EXT2_TARGET;
++	/* igos: advertise only "BIOS is upgradeable" */
++	t->bios_characteristics = BIOS_CHARACTERISTICS_UPGRADEABLE;
+ 
+ 	/* bios_major_release has only one byte, so drop century */
+ 	t->bios_major_release = U_BOOT_VERSION_NUM % 100;
+@@ -297,6 +289,9 @@ static int smbios_write_type1(ulong *current, int handle,
+ 	t->sku_number = smbios_add_prop(ctx, "sku");
+ 	t->family = smbios_add_prop(ctx, "family");
+ 
++	/* igos: Wake-up Type = AC Power Restored (0x08) */
++	t->wakeup_type = 0x08;
++
+ 	len = t->length + smbios_string_table_len(ctx);
+ 	*current += len;
+ 	unmap_sysmem(t);

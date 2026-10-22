@@ -37,4 +37,4 @@
     ftpm_srcrev = "psl-master"
     ms_tpm_srcrev = "psl-master"
     uboot_srcrev = "10.01.08"
-    linux_fw_srcrev = "ti-linux-firmware"
+    linux_fw_srcrev = "10.01.08"

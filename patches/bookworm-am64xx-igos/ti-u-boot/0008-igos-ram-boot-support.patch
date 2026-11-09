@@ -1,0 +1,115 @@
+diff --git a/arch/arm/mach-k3/am642_init.c b/arch/arm/mach-k3/am642_init.c
+index 811f323ff09..d22eaec7e59 100644
+--- a/arch/arm/mach-k3/am642_init.c
++++ b/arch/arm/mach-k3/am642_init.c
+@@ -261,9 +261,11 @@ void board_init_f(ulong dummy)
+ #endif
+ 
+ #if defined(CONFIG_K3_AM64_DDRSS)
++	#if 0
+ 	ret = uclass_get_device(UCLASS_RAM, 0, &dev);
+ 	if (ret)
+ 		panic("DRAM init failed: %d\n", ret);
++	#endif
+ #endif
+ 	if (IS_ENABLED(CONFIG_SPL_ETH) && IS_ENABLED(CONFIG_TI_AM65_CPSW_NUSS) &&
+ 	    spl_boot_device() == BOOT_DEVICE_ETHERNET) {
+diff --git a/arch/arm/mach-k3/sysfw-loader.c b/arch/arm/mach-k3/sysfw-loader.c
+index c4c5c371100..2492185f74c 100644
+--- a/arch/arm/mach-k3/sysfw-loader.c
++++ b/arch/arm/mach-k3/sysfw-loader.c
+@@ -133,11 +133,17 @@ static void k3_start_system_controller(int rproc_id, bool rproc_loaded,
+ 		ret = rproc_load(rproc_id, addr, size);
+ 		if (ret)
+ 			panic("Firmware failed to start on rproc (%d)\n", ret);
+-	}
+ 
+-	ret = rproc_start(0);
+-	if (ret)
+-		panic("Firmware init failed on rproc (%d)\n", ret);
++		ret = rproc_start(0);
++		if (ret)
++			panic("Firmware init failed on rproc (%d)\n", ret);
++	} else {
++		/* 
++		 * SYSFW was already booted externally (e.g., via JTAG ccs_init.out). 
++		 * Skip rproc_start() to prevent timeout error -110.
++		 */
++		printf("SYSFW already running, skipping rproc_start()\n");
++	}
+ }
+ 
+ static void k3_sysfw_load_using_fit(void *fit)
+diff --git a/board/perle/igos/igos.c b/board/perle/igos/igos.c
+index be396d2d416..22bc7cfc21b 100644
+--- a/board/perle/igos/igos.c
++++ b/board/perle/igos/igos.c
+@@ -377,6 +377,30 @@ static void perle_smbios_fixup(void)
+ 	}
+ }
+ 
++static void set_env_mac_addr(void)
++{
++	struct perle_am_eeprom *ep = PERLE_AM6_EEPROM_BD_INFO_DATA;
++
++	if (!do_board_detect()) {
++		int i;
++
++		for (i = 0; i < PERLE_WIFI_MAC_ADDR_CNT; i++) {
++			if (is_valid_ethaddr(ep->wifi_mac_addr[i])) {
++				eth_env_set_enetaddr_by_index("wifi", i, ep->wifi_mac_addr[i]);
++			} else {
++				debug("Invalid wifi mac%d address (%pM)\n", i, ep->wifi_mac_addr[i]);
++			}
++		}
++		for (i = 0; i < PERLE_ETH_MAC_ADDR_CNT; i++) {
++			if (is_valid_ethaddr(ep->eth_mac_addr[i])) {
++				eth_env_set_enetaddr_by_index("eth", i, ep->eth_mac_addr[i]);
++			} else {
++				debug("Invalid eth mac%d address (%pM)\n", i, ep->eth_mac_addr[i]);
++			}
++		}
++	}
++}
++
+ static void setup_board_eeprom_env(void)
+ {
+ 	char board_name[128];
+@@ -476,8 +500,10 @@ int board_late_init(void)
+ 		/* Populate the DMI/SMBIOS tables from the EEPROM */
+ 		perle_smbios_fixup();
+ 
++		set_env_mac_addr();
++
+ 		/* Write PRODUCT.ENV to eMMC partition 0:2 */
+-		write_product_env_file("mmc", "0:2", "PRODUCT.ENV");
++		//write_product_env_file("mmc", "0:2", "PRODUCT.ENV");
+ 	}
+ 
+ 	return 0;
+diff --git a/board/perle/igos/igos.env b/board/perle/igos/igos.env
+index 1f48d4501a0..39e56f62d15 100644
+--- a/board/perle/igos/igos.env
++++ b/board/perle/igos/igos.env
+@@ -10,7 +10,7 @@ mtdids=nand0=omap2-nand.0
+ mtdparts=omap2-nand.0:2m(NAND.tiboot3),2m(NAND.tispl),2m(NAND.tiboot3.backup),4m(NAND.u-boot),256k(NAND.u-boot-env),256k(NAND.u-boot-env.backup),-(NAND.file-system)
+ 
+ findfdt=
+-	setenv name_fdt perle/k3-am642-${board_prod_id}-${board_model}.dtb;
++	setenv name_fdt perle/k3-am642-${prod_id}-${model}.dtb;
+ 	setenv fdtfile ${name_fdt}
+ name_kern=Image
+ console=ttyS0,115200n8
+@@ -57,3 +57,12 @@ usbboot=setenv boot usb;
+ fw_storage_interface=mmc
+ fw_dev_part=1:2
+ #endif
++
++tftpblocksize=1468
++tftpwindowsize=128
++set_nfs_cfg=
++	setenv bootfile nfs/Image;
++	setenv fdtfile nfs/dtb/k3-am642-${prod_id}-${model}.dtb;
++	setenv bootargs console=ttyS0,115200n8 root=/dev/nfs rw nfsroot=${serverip}:/private/tftpboot/nfs/rootfs,v3,tcp ip=${ipaddr}:${serverip}:${gatewayip}:${netmask}:igos:eth0:off
++netboot=echo Booting Linux via TFTP and NFS...; tftp ${fdt_addr_r} ${fdtfile}; tftp ${kernel_addr_r} ${bootfile}; booti ${kernel_addr_r} - ${fdt_addr_r}
++securebootcmd=env import -t 0xC0000000 0x200 ipaddr serverip gatewayip netmask; run set_nfs_cfg; run netboot

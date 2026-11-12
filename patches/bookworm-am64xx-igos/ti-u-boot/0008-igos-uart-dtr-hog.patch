@@ -1,0 +1,36 @@
+diff --git a/arch/arm/dts/k3-am642-igos.dts b/arch/arm/dts/k3-am642-igos.dts
+index 62a0eab72c8..fb6ae5fa877 100644
+--- a/arch/arm/dts/k3-am642-igos.dts
++++ b/arch/arm/dts/k3-am642-igos.dts
+@@ -472,6 +472,31 @@
+ 	status = "okay";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&main_gpio1_digital_pins>;
++
++	uartd0_dtr {
++		gpio-hog;
++		gpios = <60 GPIO_ACTIVE_HIGH>;
++		output-high;
++		line-name = "UARTD0_DTR";
++	};
++	uartd2_dtr {
++		gpio-hog;
++		gpios = <66 GPIO_ACTIVE_HIGH>;
++		output-high;
++		line-name = "UARTD2_DTR";
++	};
++	uartd4_dtr {
++		gpio-hog;
++		gpios = <17 GPIO_ACTIVE_HIGH>;
++		output-high;
++		line-name = "UARTD4_DTR";
++	};
++	uartd5_dtr {
++		gpio-hog;
++		gpios = <18 GPIO_ACTIVE_HIGH>;
++		output-high;
++		line-name = "UARTD5_DTR";
++	};
+ };
+ 
+ &sdhci0 {

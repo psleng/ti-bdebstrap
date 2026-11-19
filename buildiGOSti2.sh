@@ -139,13 +139,58 @@ EOF
     echo "I: $0: Derived boot layout from $dfu_env_file: tiboot3=$BOOT3OFFSET tispl=$SPLOFFSET u-boot=$UBOOTOFFSET bytes=$BOOTIMG_SIZE_BYTES" >&2
 }
 
+# Identity of the u-boot build the environment asks for: the UEFI Secure Boot
+# mode (nexus-build buildiGOSti.sh sets UBOOTEFI_VAR + UBOOT_SIGN_KEY_DIR for
+# IGOS_SECURE=1) plus fingerprints of the preseed store and the MPK PUBLIC key.
+# Recorded next to the built u-boot so a mode/key change forces build_bsp and
+# mkdeb packages what was actually built, not what the environment says now.
+function uboot_build_mode() {
+    local mode=nonsecure sb=none mpk=ti-dummy
+    if [ -n "${UBOOTEFI_VAR:-}" ] && [ -f "${UBOOTEFI_VAR}" ]; then
+        mode=secure
+        sb=$(sha256sum < "${UBOOTEFI_VAR}" | cut -d' ' -f1)
+    fi
+    if [ -n "${UBOOT_SIGN_KEY_DIR:-}" ] && [ -f "${UBOOT_SIGN_KEY_DIR}/custMpk.pem" ]; then
+        local pub
+        pub=$(openssl pkey -in "${UBOOT_SIGN_KEY_DIR}/custMpk.pem" -pubout 2>/dev/null || true)
+        if [ -n "${pub}" ]; then
+            mpk=$(printf '%s\n' "${pub}" | sha256sum | cut -d' ' -f1)
+        else
+            mpk=file-$(sha256sum < "${UBOOT_SIGN_KEY_DIR}/custMpk.pem" | cut -d' ' -f1)
+        fi
+    fi
+    echo "${mode} sbkeys=${sb} mpk=${mpk}"
+}
+
 function mkdeb() {
     # Make a .deb of u-boot
     dir="$1"
 
     VERS=$bsp_version
     ARCH=$(dpkg-architecture -q DEB_BUILD_ARCH)
-    PKGNAME=u-boot
+    # One package per board (u-boot-am64xx-igos, u-boot-am64xx-evm, ...): every
+    # board's bootloader used to ship as plain "u-boot" with the same version, so
+    # an APT mirror could only hold one of them and a flavor could not request
+    # the right board's u-boot by name (vyos-build uboot_payload). The install
+    # path stays /usr/lib/u-boot/platform/, which update_firmware.py, the image
+    # build and manufacturing read; the boards are mutually exclusive through
+    # the igos-u-boot virtual package.
+    #
+    # Secure (UEFI Secure Boot + MPK-signed) and non-secure builds are different
+    # bootloaders, so they are different packages: u-boot-<machine>-secure also
+    # Provides igos-u-boot-secure (vyos-build checks it against sign_grub) and
+    # carries /usr/lib/u-boot/secure_boot. The mode comes from the marker written
+    # when the BSP was built, never from the current environment.
+    UBOOT_MODE=$(cat "${uboot_mode_file}" 2>/dev/null || echo unknown)
+    case "${UBOOT_MODE}" in
+        secure\ *)    PKGNAME=u-boot-${machine}-secure; OTHER=u-boot-${machine}
+                      PROVIDES="igos-u-boot, igos-u-boot-secure" ;;
+        nonsecure\ *) PKGNAME=u-boot-${machine}; OTHER=u-boot-${machine}-secure
+                      PROVIDES="igos-u-boot" ;;
+        *) echo "E: $0: unknown u-boot build mode '${UBOOT_MODE}' (${uboot_mode_file}); rebuild the BSP" >&2
+           exit 1 ;;
+    esac
+    UBOOT_DIR=usr/lib/u-boot
 
     # Compiled U-Boot version string (e.g. 2023.04-igos-1.0), extracted from the
     # build tree so a running Linux app can tell what this package carries
@@ -176,8 +221,12 @@ function mkdeb() {
 	Section: kernel
 	Maintainer: Perle Systems <psleng@perle.com>
 	Homepage: https://github.com/psleng
-	Description: The u-boot for ${machine}
+	Provides: ${PROVIDES}
+	Conflicts: igos-u-boot, u-boot
+	Replaces: igos-u-boot, u-boot
+	Description: The u-boot for ${machine} (${UBOOT_MODE%% *})
 	 machine: ${machine}
+	 build_mode: ${UBOOT_MODE}
 	 bsp_version: ${bsp_version}
 	 uboot_version: ${UBOOT_VERSION}
 	 distro: ${distro}
@@ -185,12 +234,18 @@ function mkdeb() {
 	%
 
     # The data
-    mkdir -p $PKG/usr/lib/$PKGNAME/platform
-    cp -pr "$dir"/* $PKG/usr/lib/$PKGNAME/platform
+    mkdir -p $PKG/$UBOOT_DIR/platform
+    cp -pr "$dir"/* $PKG/$UBOOT_DIR/platform
 
     # Record the compiled U-Boot version in the payload so an application can
     # read it directly:  cat /usr/lib/u-boot/uboot_version
-    echo "$UBOOT_VERSION" > $PKG/usr/lib/$PKGNAME/uboot_version
+    echo "$UBOOT_VERSION" > $PKG/$UBOOT_DIR/uboot_version
+
+    # Secure-build marker, staged with the blobs into the ISO /boot/u-boot/ (hook
+    # 27-igos-uboot.binary): manufacturing reads it to decide on uEnv.txt.
+    case "${UBOOT_MODE}" in
+        secure\ *) echo "${UBOOT_MODE}" > $PKG/$UBOOT_DIR/secure_boot ;;
+    esac
 
     # Add a single raw boot image payload built from tiboot3.bin, tispl.bin, u-boot.img
     derive_boot_layout_from_uboot_env
@@ -198,8 +253,8 @@ function mkdeb() {
     TIBOOT3="$dir/tiboot3.bin"
     TISPL="$dir/tispl.bin"
     UBOOTIMG="$dir/u-boot.img"
-    RAW_BOOT_IMG="$PKG/usr/lib/$PKGNAME/platform/u-boot-raw-boot-${machine}.img"
-    RAW_BOOT_IMG_LATEST="$PKG/usr/lib/$PKGNAME/platform/u-boot-raw-boot.img"
+    RAW_BOOT_IMG="$PKG/$UBOOT_DIR/platform/u-boot-raw-boot-${machine}.img"
+    RAW_BOOT_IMG_LATEST="$PKG/$UBOOT_DIR/platform/u-boot-raw-boot.img"
 
     if [ -f "$TIBOOT3" ] && [ -f "$TISPL" ] && [ -f "$UBOOTIMG" ]; then
         truncate -s "$BOOTIMG_SIZE_BYTES" "$RAW_BOOT_IMG"
@@ -245,6 +300,9 @@ function mkdeb() {
     mkdir -p "$DEB_OUT_DIR"
     DST=${DEB_OUT_DIR}/$DEBPKG
     mv -f $PKG.deb $DST
+    # Never leave the other mode's package next to this one: both would be
+    # linked into vyos-build/packages and conflict.
+    rm -f "${DEB_OUT_DIR}/${OTHER}_"*.deb
     echo "I: $0: Made $(realpath $DST) from $dir"
     # lintian $DEBPKG
 
@@ -606,7 +664,7 @@ do
 
     # Build BSP when either u-boot payload or OP-TEE runtime/asset inputs are missing.
     # This guarantees --ubootonly can emit BOTH:
-    #   - u-boot_<ver>_<arch>.deb
+    #   - u-boot-<machine>_<ver>_<arch>.deb
     #   - optee-tpm-assets_<ver>_all.deb
     optee_dir=${topdir}/build/${distro}/bsp_sources/optee_os
     rt_rootfs=${topdir}/build/${distro}/tisdk-debian-${distro}-${bsp_version}-rootfs
@@ -620,10 +678,17 @@ do
     bl31_file=${topdir}/build/${distro}/bsp_sources/trusted-firmware-a/build/k3/${platform}/release/bl31.bin
     tee_pager_file=${optee_dir}/out/arm-plat-k3/core/tee-pager_v2.bin
 
+    uboot_mode_file=${topdir}/build/${distro}/uboot-build-mode
+    want_uboot_mode=$(uboot_build_mode)
+
     need_bsp_build=0
     if [ ! -f "$ubootfile" ]; then
         need_bsp_build=1
         echo "I: $0: build_bsp required - missing $ubootfile"
+    fi
+    if [ "$(cat "$uboot_mode_file" 2>/dev/null)" != "$want_uboot_mode" ]; then
+        need_bsp_build=1
+        echo "I: $0: build_bsp required - u-boot build mode changed ($(cat "$uboot_mode_file" 2>/dev/null || echo none) -> ${want_uboot_mode%% *})"
     fi
     if ! compgen -G "$ta_glob" > /dev/null; then
         need_bsp_build=1
@@ -647,9 +712,10 @@ do
     fi
 
     if [ "$need_bsp_build" -eq 1 ]; then
-        rm -rf "$uboot"
+        rm -rf "$uboot" "$uboot_mode_file"
         echo "I: $0: running build_bsp ${distro} ${machine} ${bsp_version}"
         build_bsp ${distro} ${machine} ${bsp_version}
+        [ -f "$ubootfile" ] && echo "$want_uboot_mode" > "$uboot_mode_file"
     else
         echo "I: $0: skipping build_bsp - uboot and TPM asset inputs already present"
     fi

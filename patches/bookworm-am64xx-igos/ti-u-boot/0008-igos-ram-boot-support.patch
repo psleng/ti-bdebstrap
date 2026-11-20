@@ -100,16 +100,19 @@ index 1f48d4501a0..39e56f62d15 100644
  	setenv fdtfile ${name_fdt}
  name_kern=Image
  console=ttyS0,115200n8
-@@ -57,3 +57,12 @@ usbboot=setenv boot usb;
+@@ -57,3 +57,17 @@ usbboot=setenv boot usb;
  fw_storage_interface=mmc
  fw_dev_part=1:2
  #endif
 +
 +tftpblocksize=1468
 +tftpwindowsize=128
++nfsrootpath=/rootfs
++bootfile=nfs/Image
++fdtfile=nfs/dtb/${prod_id}-${model}.dtb
 +set_nfs_cfg=
-+	setenv bootfile nfs/Image;
-+	setenv fdtfile nfs/dtb/k3-am642-${prod_id}-${model}.dtb;
-+	setenv bootargs console=ttyS0,115200n8 root=/dev/nfs rw nfsroot=${serverip}:/private/tftpboot/nfs/rootfs,v3,tcp ip=${ipaddr}:${serverip}:${gatewayip}:${netmask}:igos:eth0:off
++    setenv bootargs console=ttyS0,115200n8 root=/dev/nfs rw \
++    nfsroot=${serverip}:${nfsrootpath},v3,tcp \
++    ip=${ipaddr}:${serverip}:${gatewayip}:${netmask}:igos:eth0:off
 +netboot=echo Booting Linux via TFTP and NFS...; tftp ${fdt_addr_r} ${fdtfile}; tftp ${kernel_addr_r} ${bootfile}; booti ${kernel_addr_r} - ${fdt_addr_r}
-+securebootcmd=env import -t 0xC0000000 0x200 ipaddr serverip gatewayip netmask; run set_nfs_cfg; run netboot
++securebootcmd=env import -t 0xC0000000 0x200 ipaddr serverip gatewayip netmask bootfile fdtfile nfsrootpath; run set_nfs_cfg; run netboot

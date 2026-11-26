@@ -183,9 +183,9 @@ function mkdeb() {
     # when the BSP was built, never from the current environment.
     UBOOT_MODE=$(cat "${uboot_mode_file}" 2>/dev/null || echo unknown)
     case "${UBOOT_MODE}" in
-        secure\ *)    PKGNAME=u-boot-${machine}-secure; OTHER=u-boot-${machine}
+        secure\ *)    PKGNAME=u-boot-${machine}-secure
                       PROVIDES="igos-u-boot, igos-u-boot-secure" ;;
-        nonsecure\ *) PKGNAME=u-boot-${machine}; OTHER=u-boot-${machine}-secure
+        nonsecure\ *) PKGNAME=u-boot-${machine}
                       PROVIDES="igos-u-boot" ;;
         *) echo "E: $0: unknown u-boot build mode '${UBOOT_MODE}' (${uboot_mode_file}); rebuild the BSP" >&2
            exit 1 ;;
@@ -299,10 +299,12 @@ function mkdeb() {
     DEB_OUT_DIR=${TI_BDEBSTRAP_HOME:-${topdir}/ti-bdebstrap}
     mkdir -p "$DEB_OUT_DIR"
     DST=${DEB_OUT_DIR}/$DEBPKG
+    # Keep only this build's u-boot: nexus-build links every deb here into
+    # vyos-build/packages, live-build installs all of them, and every u-boot
+    # package conflicts on igos-u-boot. A leftover from another board or mode
+    # (e.g. a multi-target nightly in one tree) would break the image build.
+    rm -f "${DEB_OUT_DIR}"/u-boot_*.deb "${DEB_OUT_DIR}"/u-boot-*.deb
     mv -f $PKG.deb $DST
-    # Never leave the other mode's package next to this one: both would be
-    # linked into vyos-build/packages and conflict.
-    rm -f "${DEB_OUT_DIR}/${OTHER}_"*.deb
     echo "I: $0: Made $(realpath $DST) from $dir"
     # lintian $DEBPKG
 
